@@ -56,7 +56,7 @@ Models will be evaluated with:
 
   **👥 Team**
 1. Valentine Mbuthu
-2. Eva Kagendo
+2. Evalyne Kagendo
    
 Supervisor: Elsie
 
