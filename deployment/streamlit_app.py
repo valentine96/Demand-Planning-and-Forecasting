@@ -18,6 +18,7 @@ st.set_page_config(
 # LOAD MODEL + DATA
 # -----------------------------
 @st.cache_resource
+@st.cache_resource
 def load_model_and_features():
     model = pickle.load(open("deployment/lightgbm_model.pkl", "rb"))
     feature_cols = pickle.load(open("deployment/feature_columns.pkl", "rb"))
@@ -28,7 +29,6 @@ def load_data():
     df = pd.read_csv("deployment/store_processed_small.csv")
     df["Date"] = pd.to_datetime(df["Date"])
     return df
-
 model, feature_cols = load_model_and_features()
 data = load_data()
 
