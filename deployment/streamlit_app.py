@@ -25,7 +25,7 @@ def load_model_and_features():
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("store_processed_small.csv")
+    df = pd.read_csv("deployment/store_processed_small.csv")
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
