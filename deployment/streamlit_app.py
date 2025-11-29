@@ -142,8 +142,8 @@ with tab_overview:
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Stores", n_stores)
-    col2.metric("Period Start", start_date)
-    col3.metric("Period End", end_date)
+    col2.metric("Period Start", start_date.strftime("%Y-%m-%d"))
+    col3.metric("Period End", end_date.strftime("%Y-%m-%d"))
     col4.metric("Records Used", f"{total_obs:,}")
 
     st.markdown("#### Recent Portfolio Trend (Average Sales Across All Stores)")
