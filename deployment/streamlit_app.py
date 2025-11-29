@@ -19,8 +19,8 @@ st.set_page_config(
 # -----------------------------
 @st.cache_resource
 def load_model_and_features():
-    model = pickle.load(open("lightgbm_model.pkl", "rb"))
-    feature_cols = pickle.load(open("feature_columns.pkl", "rb"))
+    model = pickle.load(open("deployment/lightgbm_model.pkl", "rb"))
+    feature_cols = pickle.load(open("deployment/feature_columns.pkl", "rb"))
     return model, feature_cols
 
 @st.cache_data
