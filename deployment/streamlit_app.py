@@ -35,10 +35,10 @@ except Exception as e:
     st.error(f"Failed to load model/metrics files: {e}")
 
 # =========================
-# Load Dataset
+# Load Dataset (sampled)
 # =========================
 try:
-    train_fe = pd.read_csv("deployment/store_processed_small.csv", parse_dates=["Date"])
+    train_fe = pd.read_csv("deployment/train_features_small.csv")
     data_loaded = True
 except:
     data_loaded = False
@@ -49,7 +49,7 @@ except:
 # =========================
 st.sidebar.title("🔎 Filters")
 
-if train_fe is not None:
+if train_fe is not None and "Store" in train_fe.columns:
     stores = sorted(train_fe["Store"].unique())
     selected_store = st.sidebar.selectbox("Select Store", ["All Stores"] + stores)
 else:
@@ -64,7 +64,7 @@ st.sidebar.caption("Filter forecasts by store")
 st.title("📊 Retail Demand Forecasting – Executive Dashboard")
 
 if not files_loaded:
-    st.warning("Upload all .pkl model files to run the dashboard.")
+    st.warning("Upload model files first to enable dashboard.")
     st.stop()
 
 # =========================
@@ -86,22 +86,29 @@ st.markdown("---")
 st.header("📈 Forecast vs Actual Sales")
 
 if not data_loaded:
-    st.info("Upload 'store_processed_small.csv' inside the deployment folder to view actual vs forecast trends.")
+    st.info("Upload 'train_features_small.csv' inside deployment folder.")
 else:
     plot_df = train_fe.copy()
 
-    if selected_store != "All Stores":
+    if selected_store != "All Stores" and "Store" in plot_df.columns:
         plot_df = plot_df[plot_df["Store"] == selected_store]
 
     try:
-        plot_df["Forecast"] = lgb_model.predict(plot_df[feature_cols])
+        # Ensure using only model features
+        features_for_pred = [f for f in feature_cols if f in plot_df.columns]
+        plot_df["Forecast"] = lgb_model.predict(plot_df[features_for_pred])
     except Exception as e:
         st.error(f"Prediction failed: {e}")
         st.stop()
 
+    if "Date" in plot_df.columns:
+        date_col = "Date"
+    else:
+        date_col = plot_df.columns[0]
+
     fig, ax = plt.subplots(figsize=(14, 5))
-    ax.plot(plot_df["Date"], plot_df["Sales"], label="Actual Sales")
-    ax.plot(plot_df["Date"], plot_df["Forecast"], label="Forecasted Sales", linestyle="--")
+    ax.plot(plot_df[date_col], plot_df["Sales"], label="Actual Sales")
+    ax.plot(plot_df[date_col], plot_df["Forecast"], label="Forecasted Sales", linestyle="--")
     ax.set_xlabel("Date")
     ax.set_ylabel("Sales")
     ax.legend()
@@ -145,7 +152,7 @@ else:
         import shap
 
         n_samples = min(2000, len(train_fe))
-        sample_df = train_fe.sample(n=n_samples, random_state=42)[feature_cols]
+        sample_df = train_fe.sample(n=n_samples, random_state=42)[features_for_pred]
 
         explainer = shap.TreeExplainer(lgb_model)
         shap_values = explainer.shap_values(sample_df.values)
@@ -153,12 +160,12 @@ else:
         st.info("The chart below highlights the strongest drivers of product demand.")
 
         fig, ax = plt.subplots(figsize=(10,6))
-        shap.summary_plot(shap_values, sample_df, feature_names=feature_cols, show=False)
+        shap.summary_plot(shap_values, sample_df, feature_names=features_for_pred, show=False)
         st.pyplot(fig)
 
     except Exception as e:
-        st.warning("SHAP is not available or failed.")
-        st.caption("Install 'shap' in requirements.txt to enable feature importance visuals.")
+        st.warning("SHAP could not run.")
+        st.caption("Install `shap` in app requirements to enable feature importance.")
 
 st.markdown("---")
 
@@ -172,12 +179,11 @@ st.markdown(
 ### What The Model Achieves
 
 - Forecasting accuracy improved by **{lift:.2f}%**
-- Supports better inventory planning
-- Fewer stockouts and reduced overstocking
-- Better allocation of promo budgets
-- Stronger replenishment strategy
-- Actionable weekly & seasonal forecasting
+- Supports smarter inventory planning
+- Reduces stockouts and overstocking
+- Optimizes promotional scheduling
+- Enhances weekly & seasonal demand insight
 
-> LightGBM meets the core capstone goal of a **20–30% improvement** over baseline.
+> LightGBM achieves the project's core goal of a **20–30% improvement** over baseline.
 """
 )
