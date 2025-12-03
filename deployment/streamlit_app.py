@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-import shap
 import matplotlib.pyplot as plt
 
 # =========================
@@ -26,10 +25,10 @@ def load_pickle(path):
 # Load Models and Metrics
 # =========================
 try:
-    lgb_model = load_pickle("lgb_model.pkl")
-    baseline_results = load_pickle("baseline_metrics.pkl")
-    lightgbm_results = load_pickle("lightgbm_metrics.pkl")
-    feature_cols = load_pickle("feature_columns.pkl")
+    lgb_model = load_pickle("deployment/lgb_model.pkl")
+    baseline_results = load_pickle("deployment/baseline_metrics.pkl")
+    lightgbm_results = load_pickle("deployment/lightgbm_metrics.pkl")
+    feature_cols = load_pickle("deployment/feature_columns.pkl")
     files_loaded = True
 except Exception as e:
     files_loaded = False
@@ -39,7 +38,7 @@ except Exception as e:
 # Load Feature Dataset
 # =========================
 try:
-    train_fe = pd.read_csv("store_processed_small.csv", parse_dates=["Date"])
+    train_fe = pd.read_csv("deployment/store_processed_small.csv", parse_dates=["Date"])
     data_loaded = True
 except:
     data_loaded = False
@@ -57,7 +56,7 @@ else:
     selected_store = "All Stores"
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Filter forecasts by store.")
+st.sidebar.caption("Filter forecasts by store")
 
 # =========================
 # Dashboard Title
@@ -87,7 +86,7 @@ st.markdown("---")
 st.header("📈 Forecast vs Actual Sales")
 
 if not data_loaded:
-    st.info("Upload 'store_processed_small.csv' to view actual vs forecast plots.")
+    st.info("Upload 'store_processed_small.csv' inside the deployment folder to view actual vs forecast trends.")
 else:
     plot_df = train_fe.copy()
 
@@ -127,9 +126,9 @@ st.dataframe(comparison_df, use_container_width=True)
 
 st.markdown(
     f"""
-**Insight**  
+**Insight:**  
 LightGBM improves forecasting accuracy by **{lift:.2f}%** 
-compared to the baseline Seasonal Naïve.
+compared to the baseline Seasonal Naïve model.
 """
 )
 
@@ -144,6 +143,8 @@ if not data_loaded:
     st.info("Upload dataset to generate SHAP analysis.")
 else:
     try:
+        import shap
+
         n_samples = min(2000, len(train_fe))
         sample_df = train_fe.sample(n=n_samples, random_state=42)[feature_cols]
 
@@ -157,8 +158,8 @@ else:
         st.pyplot(fig)
 
     except Exception as e:
-        st.error(f"SHAP Plot Error: {e}")
-        st.caption("Check if feature_cols.pkl matches your dataset features.")
+        st.warning("SHAP is not available or failed.")
+        st.caption("Install 'shap' in requirements.txt to enable feature importance visuals.")
 
 st.markdown("---")
 
@@ -169,15 +170,15 @@ st.header("💼 Business Value Summary")
 
 st.markdown(
     f"""
-### What the Model Delivers
+### What The Model Achieves
 
 - Forecasting accuracy improved by **{lift:.2f}%**
-- More reliable demand planning
-- Reduced stockouts and overstock cycles
-- Better evidence-based promotional scheduling
-- Strengthened replenishment planning
+- Supports better inventory planning
+- Fewer stockouts and reduced overstocking
+- Optimized promotional timing
+- Reliable weekly & seasonal forecasting
 
-> LightGBM meets the target improvement of **20–30%** over baseline, as proposed in your capstone project.
+> LightGBM meets the core capstone goal of **20–30% improvement** over the baseline model.
 
 """
 )
