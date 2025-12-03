@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # =====================================
-# Helper Functions
+# Helper - Load Pickle
 # =====================================
 @st.cache_data
 def load_pickle(path):
@@ -32,43 +32,48 @@ try:
     files_loaded = True
 except Exception as e:
     files_loaded = False
-    st.error(f"Failed to load model files: {e}")
+    st.error(f"❌ Failed to load model files: {e}")
 
 if not files_loaded:
     st.stop()
 
 # =====================================
-# Load Full Dataset (for plotting)
-# MUST contain Sales, Store, Date, features
+# Load Full Dataset (MUST contain all model features + Date, Sales, Store)
 # =====================================
 try:
     plot_df = pd.read_csv("deployment/store_processed_small.csv")
 
-    # Ensure Date is datetime type
+    # ensure Date is datetime
     if "Date" in plot_df.columns:
         plot_df["Date"] = pd.to_datetime(plot_df["Date"], errors="coerce")
 
     df_loaded = True
 except Exception as e:
     df_loaded = False
-    st.error(f"Failed to load dataset: {e}")
+    st.error(f"❌ Failed to load dataset: {e}")
 
 if not df_loaded:
     st.stop()
 
 # =====================================
-# Restore Training Dtypes
+# Restore correct dtypes to match training
 # =====================================
+
+# Fix StateHoliday safely (training dtype: int64)
+if "StateHoliday" in plot_df.columns:
+    plot_df["StateHoliday"] = pd.to_numeric(
+        plot_df["StateHoliday"],
+        errors="coerce"
+    ).fillna(0).astype("int64")
+
+# Restore categorical types
 categorical_cols = ["PromoInterval", "StoreType", "Assortment"]
 for col in categorical_cols:
     if col in plot_df.columns:
         plot_df[col] = plot_df[col].astype("category")
 
-if "StateHoliday" in plot_df.columns:
-    plot_df["StateHoliday"] = plot_df["StateHoliday"].astype("int64")
-
 # =====================================
-# Sidebar Store Filter
+# Sidebar Filters
 # =====================================
 st.sidebar.title("🔎 Filters")
 
@@ -81,7 +86,6 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.caption("Filter forecasts by store")
 
-# Filter data if store is selected
 if selected_store != "All Stores":
     plot_df = plot_df[plot_df["Store"] == selected_store]
 
@@ -91,7 +95,7 @@ if selected_store != "All Stores":
 st.title("📊 Retail Demand Forecasting – Executive Dashboard")
 
 # =====================================
-# KPIs Section
+# KPI Metrics
 # =====================================
 c1, c2, c3 = st.columns(3)
 
@@ -108,26 +112,28 @@ st.markdown("---")
 # =====================================
 st.header("📈 Forecast vs Actual Sales")
 
-# Ensure all model-required features exist
+# Check features are present
 available_features = [f for f in feature_cols if f in plot_df.columns]
 missing_features = [f for f in feature_cols if f not in plot_df.columns]
 
 if missing_features:
-    st.error(f"Missing model features in dataset: {missing_features}")
+    st.error(f"❌ Missing model features in dataset: {missing_features}")
     st.stop()
 
-# Predict directly from current dataset
+# Run prediction
 try:
     plot_df["Forecast"] = lgb_model.predict(plot_df[available_features])
 except Exception as e:
-    st.error(f"Prediction failed: {e}")
+    st.error(f"❌ Prediction failed: {e}")
     st.stop()
 
-# Ensure columns for plotting exist
-for col in ["Date", "Sales", "Forecast"]:
-    if col not in plot_df.columns:
-        st.error(f"'{col}' column missing in dataset, cannot plot forecast.")
-        st.stop()
+# Validate required plotting fields
+required_cols = ["Date", "Sales", "Forecast"]
+missing_for_plot = [c for c in required_cols if c not in plot_df.columns]
+
+if missing_for_plot:
+    st.error(f"❌ Columns missing for plotting: {missing_for_plot}")
+    st.stop()
 
 # Plot Actual vs Forecast
 fig, ax = plt.subplots(figsize=(14, 5))
@@ -141,7 +147,7 @@ st.pyplot(fig)
 st.markdown("---")
 
 # =====================================
-# Model Comparison Table
+# Model Comparison Section
 # =====================================
 st.header("🏁 Model Accuracy Comparison")
 
@@ -158,34 +164,34 @@ st.markdown(
     f"""
 **Insight:**  
 LightGBM improved forecasting accuracy by **{improvement:.2f}%**  
-compared to baseline Seasonal Naïve forecasting.
+compared to the baseline Seasonal Naïve approach.
 """
 )
 
 st.markdown("---")
 
 # =====================================
-# SHAP (optional)
+# SHAP — Feature Importance (Optional)
 # =====================================
-st.header("🔍 Key Demand Drivers (Feature Importance)")
+st.header("🔍 Key Demand Drivers")
 
 try:
     import shap
 
-    sample_size = min(2000, len(plot_df))
-    shap_df = plot_df.sample(n=sample_size, random_state=42)[available_features]
+    # sample for SHAP speed
+    n = min(2000, len(plot_df))
+    shap_df = plot_df.sample(n=n, random_state=42)[available_features]
 
     explainer = shap.TreeExplainer(lgb_model)
     shap_values = explainer.shap_values(shap_df.values)
-
-    st.caption("The chart below highlights which features have the strongest influence on demand forecasts.")
 
     fig, ax = plt.subplots(figsize=(10,6))
     shap.summary_plot(shap_values, shap_df, feature_names=available_features, show=False)
     st.pyplot(fig)
 
 except Exception:
-    st.warning("SHAP could not run. Add `shap` to your requirements.txt to enable feature importance.")
+    st.warning("SHAP not available. Install `shap` in requirements.txt if needed.")
+    st.caption("SHAP is optional and only used for model explainability.")
 
 st.markdown("---")
 
@@ -196,15 +202,14 @@ st.header("💼 Business Value Summary")
 
 st.markdown(
     f"""
-### Key Insights
+### Key Takeaways
 
 - Forecasting accuracy improved by **{improvement:.2f}%**
-- Enables smarter procurement decisions
-- Helps plan promotions more effectively
-- Supports proactive inventory control
-- Enhances store-level visibility of seasonal trends
+- Supports smarter procurement and supply planning
+- Reduces losses from overstocking and missed demand
+- Reveals seasonal demand trends at store level
+- Strengthens data-driven strategic decision-making
 
-> LightGBM successfully demonstrates the value of AI-driven demand forecasting in retail.
+> LightGBM successfully demonstrates significant uplift over baseline forecasting for retail demand.
 """
 )
-
