@@ -35,35 +35,65 @@ except Exception as e:
     st.error(f"Failed to load model/metrics files: {e}")
 
 # =========================
-# Load Dataset (sampled)
+# Load Dataset — Full data (Sales, Date, Store)
 # =========================
 try:
-    train_fe = pd.read_csv("deployment/train_features_small.csv")
+    plot_df = pd.read_csv("deployment/store_processed_small.csv")
 
-    # =====================================
-    # RESTORE RAW TRAINING DATA TYPES HERE
-    # =====================================
+    # Ensure Date is datetime
+    if "Date" in plot_df.columns:
+        plot_df["Date"] = pd.to_datetime(plot_df["Date"], errors="coerce")
+
+    df_loaded = True
+except Exception as e:
+    df_loaded = False
+    plot_df = None
+    st.error(f"Failed to load plotting dataset: {e}")
+
+# =========================
+# Load Dataset — Model Feature Data
+# =========================
+try:
+    model_df = pd.read_csv("deployment/train_features_small.csv")
+
+    # Restore training dtypes
     categorical_cols = ["PromoInterval", "StoreType", "Assortment"]
     for col in categorical_cols:
-        if col in train_fe.columns:
-            train_fe[col] = train_fe[col].astype("category")
+        if col in model_df.columns:
+            model_df[col] = model_df[col].astype("category")
 
-    if "StateHoliday" in train_fe.columns:
-        train_fe["StateHoliday"] = train_fe["StateHoliday"].astype("int64")
+    if "StateHoliday" in model_df.columns:
+        model_df["StateHoliday"] = model_df["StateHoliday"].astype("int64")
 
-    data_loaded = True
+    feat_loaded = True
 except Exception as e:
-    data_loaded = False
-    train_fe = None
-    st.error(f"Failed to load dataset: {e}")
+    feat_loaded = False
+    model_df = None
+    st.error(f"Failed to load feature dataset: {e}")
+
+# =========================
+# Safety Checks
+# =========================
+if not files_loaded:
+    st.stop()
+
+if not df_loaded or not feat_loaded:
+    st.stop()
+
+# =========================
+# Ensure ID column exists in both
+# =========================
+if "Id" not in model_df.columns or "Id" not in plot_df.columns:
+    st.error("❌ 'Id' column is missing in either dataset. Cannot align predictions.")
+    st.stop()
 
 # =========================
 # Sidebar Filters
 # =========================
 st.sidebar.title("🔎 Filters")
 
-if train_fe is not None and "Store" in train_fe.columns:
-    stores = sorted(train_fe["Store"].unique())
+if "Store" in plot_df.columns:
+    stores = sorted(plot_df["Store"].unique())
     selected_store = st.sidebar.selectbox("Select Store", ["All Stores"] + stores)
 else:
     selected_store = "All Stores"
@@ -76,10 +106,6 @@ st.sidebar.caption("Filter forecasts by store")
 # =========================
 st.title("📊 Retail Demand Forecasting – Executive Dashboard")
 
-if not files_loaded:
-    st.warning("Upload model files first to enable dashboard.")
-    st.stop()
-
 # =========================
 # KPI Metrics
 # =========================
@@ -88,44 +114,53 @@ c1, c2, c3 = st.columns(3)
 c1.metric("Baseline MAPE", f"{baseline_results['MAPE']:.2f}%")
 c2.metric("LightGBM MAPE", f"{lightgbm_results['MAPE']:.2f}%")
 
-lift = baseline_results['MAPE'] - lightgbm_results['MAPE']
-c3.metric("Accuracy Improvement", f"{lift:.2f}%", "Better than baseline")
+improvement = baseline_results['MAPE'] - lightgbm_results['MAPE']
+c3.metric("Accuracy Improvement", f"{improvement:.2f}%", "Better than baseline")
 
 st.markdown("---")
 
 # =========================
-# Forecast vs Actual
+# Generate Forecasts
 # =========================
 st.header("📈 Forecast vs Actual Sales")
 
-if not data_loaded:
-    st.info("Upload 'train_features_small.csv' inside deployment folder.")
-else:
-    plot_df = train_fe.copy()
+try:
+    # Only keep features that exist in model_df
+    features_for_pred = [f for f in feature_cols if f in model_df.columns]
 
-    if selected_store != "All Stores" and "Store" in plot_df.columns:
-        plot_df = plot_df[plot_df["Store"] == selected_store]
+    model_df["Forecast"] = lgb_model.predict(model_df[features_for_pred])
 
-    try:
-        # Ensure using only model features
-        features_for_pred = [f for f in feature_cols if f in plot_df.columns]
-        plot_df["Forecast"] = lgb_model.predict(plot_df[features_for_pred])
-    except Exception as e:
-        st.error(f"Prediction failed: {e}")
-        st.stop()
+    # Merge forecasts back to full dataset
+    plot_df = plot_df.merge(
+        model_df[["Id", "Forecast"]],
+        on="Id",
+        how="left"
+    )
 
-    if "Date" in plot_df.columns:
-        date_col = "Date"
-    else:
-        date_col = plot_df.columns[0]
+except Exception as e:
+    st.error(f"Prediction failed: {e}")
+    st.stop()
 
-    fig, ax = plt.subplots(figsize=(14, 5))
-    ax.plot(plot_df[date_col], plot_df["Sales"], label="Actual Sales")
-    ax.plot(plot_df[date_col], plot_df["Forecast"], label="Forecasted Sales", linestyle="--")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Sales")
-    ax.legend()
-    st.pyplot(fig)
+# Filter by Store
+if selected_store != "All Stores" and "Store" in plot_df.columns:
+    plot_df = plot_df[plot_df["Store"] == selected_store]
+
+# Confirm required columns
+needed = ["Date", "Sales", "Forecast"]
+missing = [c for c in needed if c not in plot_df.columns]
+
+if missing:
+    st.error(f"Missing required columns: {missing}")
+    st.stop()
+
+# Plot
+fig, ax = plt.subplots(figsize=(14, 5))
+ax.plot(plot_df["Date"], plot_df["Sales"], label="Actual Sales")
+ax.plot(plot_df["Date"], plot_df["Forecast"], label="Forecasted Sales", linestyle="--")
+ax.set_xlabel("Date")
+ax.set_ylabel("Sales")
+ax.legend()
+st.pyplot(fig)
 
 st.markdown("---")
 
@@ -134,20 +169,19 @@ st.markdown("---")
 # =========================
 st.header("🏁 Model Accuracy Comparison")
 
-comparison_df = pd.DataFrame({
+cmp_df = pd.DataFrame({
     "Model": ["Seasonal Naive", "LightGBM"],
     "RMSE": [baseline_results["RMSE"], lightgbm_results["RMSE"]],
     "MAPE (%)": [baseline_results["MAPE"], lightgbm_results["MAPE"]],
     "WAPE (%)": [baseline_results["WAPE"], lightgbm_results["WAPE"]],
 })
 
-st.dataframe(comparison_df, use_container_width=True)
+st.dataframe(cmp_df, use_container_width=True)
 
 st.markdown(
     f"""
 **Insight:**  
-LightGBM improves forecasting accuracy by **{lift:.2f}%** 
-compared to the baseline Seasonal Naïve model.
+LightGBM improves forecasting accuracy by **{improvement:.2f}%** over the baseline Seasonal Naïve model.
 """
 )
 
@@ -158,27 +192,22 @@ st.markdown("---")
 # =========================
 st.header("🔍 Key Demand Drivers")
 
-if not data_loaded:
-    st.info("Upload dataset to generate SHAP analysis.")
-else:
-    try:
-        import shap
+try:
+    import shap
 
-        n_samples = min(2000, len(train_fe))
-        sample_df = train_fe.sample(n=n_samples, random_state=42)[features_for_pred]
+    n = min(2000, len(model_df))
+    shap_df = model_df.sample(n=n, random_state=42)[features_for_pred]
 
-        explainer = shap.TreeExplainer(lgb_model)
-        shap_values = explainer.shap_values(sample_df.values)
+    explainer = shap.TreeExplainer(lgb_model)
+    shap_values = explainer.shap_values(shap_df.values)
 
-        st.info("The chart below highlights the strongest drivers of product demand.")
+    fig, ax = plt.subplots(figsize=(10,6))
+    shap.summary_plot(shap_values, shap_df, feature_names=features_for_pred, show=False)
+    st.pyplot(fig)
 
-        fig, ax = plt.subplots(figsize=(10,6))
-        shap.summary_plot(shap_values, sample_df, feature_names=features_for_pred, show=False)
-        st.pyplot(fig)
-
-    except Exception as e:
-        st.warning("SHAP could not run.")
-        st.caption("Install `shap` in app requirements to enable feature importance.")
+except Exception:
+    st.warning("SHAP not available. Install `shap` in the requirements file.")
+    st.caption("Used only for feature importance explanation.")
 
 st.markdown("---")
 
@@ -191,12 +220,14 @@ st.markdown(
     f"""
 ### What The Model Achieves
 
-- Forecasting accuracy improved by **{lift:.2f}%**
+- Forecasting accuracy improved by **{improvement:.2f}%**
 - Supports smarter inventory planning
 - Reduces stockouts and overstocking
 - Optimizes promotional scheduling
-- Enhances weekly & seasonal demand insight
+- Enhances weekly & seasonal demand insights
 
-> LightGBM achieves the project's core goal of a **20–30% improvement** over baseline.
+> LightGBM demonstrates the project's goal of a significant uplift over baseline forecasting.
 """
 )
+
+
