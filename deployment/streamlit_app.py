@@ -35,7 +35,7 @@ except Exception as e:
     st.error(f"Failed to load model/metrics files: {e}")
 
 # =========================
-# Load Feature Dataset
+# Load Dataset
 # =========================
 try:
     train_fe = pd.read_csv("deployment/store_processed_small.csv", parse_dates=["Date"])
@@ -73,9 +73,9 @@ if not files_loaded:
 c1, c2, c3 = st.columns(3)
 
 c1.metric("Baseline MAPE", f"{baseline_results['MAPE']:.2f}%")
-c2.metric("LightGBM MAPE", f"{lightgbm_results['MAPE (%)']:.2f}%")
+c2.metric("LightGBM MAPE", f"{lightgbm_results['MAPE']:.2f}%")
 
-lift = baseline_results['MAPE'] - lightgbm_results['MAPE (%)']
+lift = baseline_results['MAPE'] - lightgbm_results['MAPE']
 c3.metric("Accuracy Improvement", f"{lift:.2f}%", "Better than baseline")
 
 st.markdown("---")
@@ -93,7 +93,6 @@ else:
     if selected_store != "All Stores":
         plot_df = plot_df[plot_df["Store"] == selected_store]
 
-    # Predictions
     try:
         plot_df["Forecast"] = lgb_model.predict(plot_df[feature_cols])
     except Exception as e:
@@ -118,8 +117,8 @@ st.header("🏁 Model Accuracy Comparison")
 comparison_df = pd.DataFrame({
     "Model": ["Seasonal Naive", "LightGBM"],
     "RMSE": [baseline_results["RMSE"], lightgbm_results["RMSE"]],
-    "MAPE (%)": [baseline_results["MAPE"], lightgbm_results["MAPE (%)"]],
-    "WAPE (%)": [baseline_results["WAPE"], lightgbm_results["WAPE (%)"]],
+    "MAPE (%)": [baseline_results["MAPE"], lightgbm_results["MAPE"]],
+    "WAPE (%)": [baseline_results["WAPE"], lightgbm_results["WAPE"]],
 })
 
 st.dataframe(comparison_df, use_container_width=True)
@@ -175,10 +174,10 @@ st.markdown(
 - Forecasting accuracy improved by **{lift:.2f}%**
 - Supports better inventory planning
 - Fewer stockouts and reduced overstocking
-- Optimized promotional timing
-- Reliable weekly & seasonal forecasting
+- Better allocation of promo budgets
+- Stronger replenishment strategy
+- Actionable weekly & seasonal forecasting
 
-> LightGBM meets the core capstone goal of **20–30% improvement** over the baseline model.
-
+> LightGBM meets the core capstone goal of a **20–30% improvement** over baseline.
 """
 )
