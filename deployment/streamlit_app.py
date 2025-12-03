@@ -39,10 +39,23 @@ except Exception as e:
 # =========================
 try:
     train_fe = pd.read_csv("deployment/train_features_small.csv")
+
+    # =====================================
+    # RESTORE RAW TRAINING DATA TYPES HERE
+    # =====================================
+    categorical_cols = ["PromoInterval", "StoreType", "Assortment"]
+    for col in categorical_cols:
+        if col in train_fe.columns:
+            train_fe[col] = train_fe[col].astype("category")
+
+    if "StateHoliday" in train_fe.columns:
+        train_fe["StateHoliday"] = train_fe["StateHoliday"].astype("int64")
+
     data_loaded = True
-except:
+except Exception as e:
     data_loaded = False
     train_fe = None
+    st.error(f"Failed to load dataset: {e}")
 
 # =========================
 # Sidebar Filters
