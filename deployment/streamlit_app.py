@@ -27,14 +27,16 @@ SAMPLE_DATA_PATH = f"{ARTIFACT_DIR}/deployment_full_features.csv"
 # ------------------------------------------------------------------------------
 # Utilities
 # ------------------------------------------------------------------------------
-def verify_file(path: str):
+def verify_file(path: str) -> bool:
+    """Check if a file exists."""
     return os.path.exists(path)
 
-def missing(msg):
+def missing(msg: str):
+    """Show a Streamlit error for a missing file."""
     st.error(f"❌ Missing file: `{msg}`")
 
 @st.cache_data
-def load_pickle(path):
+def load_pickle(path: str):
     try:
         with open(path, "rb") as f:
             return pickle.load(f)
@@ -42,7 +44,7 @@ def load_pickle(path):
         return None
 
 @st.cache_data
-def load_csv(path):
+def load_csv(path: str):
     try:
         return pd.read_csv(path)
     except Exception:
@@ -62,7 +64,6 @@ required = {
 }
 
 missing_any = False
-
 for name, path in required.items():
     if not verify_file(path):
         missing(path)
@@ -76,20 +77,29 @@ if missing_any:
 # Load Everything
 # ------------------------------------------------------------------------------
 model = load_pickle(MODEL_PATH)
-features = load_pickle(FEATURES_PATH)
+features = load_pickle(FEATURES_PATH)          # this is a list of column names
 baseline_metrics = load_pickle(BASELINE_METRICS_PATH)
 arima_metrics = load_pickle(ARIMA_METRICS_PATH)
 sarima_metrics = load_pickle(SARIMA_METRICS_PATH)
 lgbm_metrics = load_pickle(LGBM_METRICS_PATH)
 sample_df = load_csv(SAMPLE_DATA_PATH)
 
-# Fail-safe
+# Fail-safe for loading
 if any(x is None for x in [
     model, features, baseline_metrics, arima_metrics,
     sarima_metrics, lgbm_metrics, sample_df
 ]):
-    st.error("❌ One or more artifacts could not be loaded. Ensure correct pickle versions.")
+    st.error("❌ One or more artifacts could not be loaded. Ensure correct pickle/CSV versions.")
     st.stop()
+
+# Normalise feature names into a list
+if isinstance(features, (list, tuple)):
+    feature_names = list(features)
+else:
+    # Fallback if someone saved a DataFrame/Series instead
+    feature_names = list(getattr(features, "columns", features))
+
+n_features = len(feature_names)
 
 # ------------------------------------------------------------------------------
 # UI Header
@@ -97,34 +107,28 @@ if any(x is None for x in [
 st.title("🧠 Demand Planning & Forecasting System")
 st.markdown("### Machine Learning Driven Forecasting for Retail & FMCG")
 
-st.success(f"📌 Loaded model expects **{features.shape[1]} features**.")
+st.success(f"📌 Loaded model expects **{n_features} features**.")
 st.info(f"📄 Sample data contains **{sample_df.shape[1]} columns**.")
 
 st.divider()
 
 # ------------------------------------------------------------------------------
-# FIX: Align categorical features with training data
+# Simple categorical handling (no category-set alignment needed here)
 # ------------------------------------------------------------------------------
-st.subheader("🔧 Feature Alignment Check")
+st.subheader("🔧 Feature Type Check")
 
 categorical_cols = ["StoreType", "Assortment", "PromoInterval", "StateHoliday"]
-
-aligned_categories = []
+casted = []
 
 for col in categorical_cols:
-    if col in sample_df.columns and col in features.columns:
-        # Convert to category
+    if col in sample_df.columns:
         sample_df[col] = sample_df[col].astype("category")
-        # Align categories to those used during training
-        sample_df[col] = sample_df[col].cat.set_categories(
-            features[col].cat.categories
-        )
-        aligned_categories.append(col)
+        casted.append(col)
 
-if aligned_categories:
-    st.success(f"✔️ Categorical features aligned: {', '.join(aligned_categories)}")
+if casted:
+    st.success(f"✔️ Cast to categorical dtype: {', '.join(casted)}")
 else:
-    st.warning("⚠️ No categorical alignment needed or columns not found.")
+    st.info("ℹ️ No categorical casting applied (columns not found or already numeric).")
 
 st.divider()
 
@@ -134,7 +138,6 @@ st.divider()
 st.header("🔍 Preview Input Data Used For Prediction")
 
 rows = st.slider("Rows to preview", 1, 50, 5)
-
 st.dataframe(sample_df.head(rows), use_container_width=True)
 
 st.divider()
@@ -144,18 +147,22 @@ st.divider()
 # ------------------------------------------------------------------------------
 st.header("📦 Store Sales Prediction using LightGBM")
 
-st.write("Model loaded successfully. Preview sample input data:")
+st.write("Model loaded successfully. Preview sample input data used in prediction:")
 st.dataframe(sample_df.head(), use_container_width=True)
 
 if st.button("🚀 Run Forecast Now"):
     try:
-        X = sample_df[features.columns]
+        # Ensure we only use the expected feature columns in the correct order
+        X = sample_df[feature_names]
         preds = model.predict(X)
+
         sample_df["Forecast"] = preds
 
         st.success("🎉 Prediction Completed Successfully!")
-        st.dataframe(sample_df[["Date","Store","Forecast"]].head(10), use_container_width=True)
-
+        st.dataframe(
+            sample_df[["Date", "Store", "Forecast"]].head(10),
+            use_container_width=True
+        )
     except Exception as e:
         st.error(f"❌ Prediction failed: {str(e)}")
 
