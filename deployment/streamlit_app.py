@@ -4,6 +4,14 @@ import pickle
 import os
 
 # -----------------------------------------------------
+# MUST BE FIRST STREAMLIT CALL
+# -----------------------------------------------------
+st.set_page_config(
+    page_title="Forecasting System",
+    layout="wide"
+)
+
+# -----------------------------------------------------
 # Paths (Important!)
 # -----------------------------------------------------
 ARTIFACT_DIR = "deployment"
@@ -15,7 +23,6 @@ ARIMA_METRICS_PATH     = f"{ARTIFACT_DIR}/arima_metrics.pkl"
 SARIMA_METRICS_PATH    = f"{ARTIFACT_DIR}/sarima_metrics.pkl"
 LGBM_METRICS_PATH      = f"{ARTIFACT_DIR}/lightgbm_metrics.pkl"
 SAMPLE_DATA_PATH       = f"{ARTIFACT_DIR}/store1_weekly_predictions.csv"
-
 
 # -----------------------------------------------------
 # Utilities
