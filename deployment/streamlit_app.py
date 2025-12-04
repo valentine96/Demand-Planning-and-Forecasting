@@ -1,138 +1,148 @@
 import streamlit as st
 import pandas as pd
 import pickle
-import base64
+import os
 
-# -------------------------------------------------------
-#  CONFIG
-# -------------------------------------------------------
-DEPLOY_DIR = "."   # Since app runs inside deployment folder on Streamlit Cloud
-st.set_page_config(page_title="Demand Forecasting System", layout="wide")
+# -----------------------------------------
+# Paths (Important!)
+# -----------------------------------------
+ARTIFACT_DIR = "deployment"
 
-# -------------------------------------------------------
-#  LOADER HELPERS (CACHED)
-# -------------------------------------------------------
+MODEL_PATH = f"{ARTIFACT_DIR}/lightgbm_model.pkl"
+FEATURES_PATH = f"{ARTIFACT_DIR}/feature_columns.pkl"
+BASELINE_METRICS_PATH = f"{ARTIFACT_DIR}/baseline_metrics.pkl"
+ARIMA_METRICS_PATH = f"{ARTIFACT_DIR}/arima_metrics.pkl"
+SARIMA_METRICS_PATH = f"{ARTIFACT_DIR}/sarima_metrics.pkl"
+LGBM_METRICS_PATH = f"{ARTIFACT_DIR}/lightgbm_metrics.pkl"
+SAMPLE_DATA_PATH = f"{ARTIFACT_DIR}/store1_weekly_predictions.csv"
+
+# -----------------------------------------
+# Utilities
+# -----------------------------------------
+def verify_file(path:str):
+    """Check if a file exists."""
+    return os.path.exists(path)
+
+def missing(msg):
+    st.error(f"❌ Missing file: `{msg}`")
+
+# -----------------------------------------
+# Loaders (cached)
+# -----------------------------------------
 @st.cache_data
-def load_pickle(file_name):
-    file_path = f"{DEPLOY_DIR}/{file_name}"
+def load_pickle(path):
     try:
-        with open(file_path, "rb") as f:
+        with open(path, "rb") as f:
             return pickle.load(f)
-    except FileNotFoundError:
-        st.error(f"❌ Missing file: `{file_name}`")
+    except:
         return None
 
-# Model
 @st.cache_data
-def load_model():
-    return load_pickle("lightgbm_model.pkl")
+def load_csv(path):
+    try:
+        return pd.read_csv(path)
+    except:
+        return None
 
-# Feature Columns
-@st.cache_data
-def load_features():
-    return load_pickle("feature_columns.pkl")
+# -----------------------------------------
+# Load Everything
+# -----------------------------------------
+model = load_pickle(MODEL_PATH)
+features = load_pickle(FEATURES_PATH)
+baseline_metrics = load_pickle(BASELINE_METRICS_PATH)
+arima_metrics = load_pickle(ARIMA_METRICS_PATH)
+sarima_metrics = load_pickle(SARIMA_METRICS_PATH)
+lightgbm_metrics = load_pickle(LGBM_METRICS_PATH)
+sample_df = load_csv(SAMPLE_DATA_PATH)
 
-# Metrics
-@st.cache_data
-def load_baseline_metrics():
-    return load_pickle("baseline_metrics.pkl")
+# -----------------------------------------------------
+# UI
+# -----------------------------------------------------
+st.set_page_config(page_title="Forecasting System", layout="wide")
 
-@st.cache_data
-def load_arima_metrics():
-    return load_pickle("arima_metrics.pkl")
+st.title("📊 Demand Planning & Forecasting System")
+st.markdown("### Machine Learning Driven Forecasting for Retail & FMCG")
 
-@st.cache_data
-def load_sarima_metrics():
-    return load_pickle("sarima_metrics.pkl")
+# Check missing artifacts
+required = {
+    "Model File": MODEL_PATH,
+    "Feature Columns": FEATURES_PATH,
+    "Store Predictions Sample": SAMPLE_DATA_PATH,
+}
 
-@st.cache_data
-def load_lgbm_metrics():
-    return load_pickle("lightgbm_metrics.pkl")
+missing_any = False
+for key, path in required.items():
+    if not verify_file(path):
+        missing(path)
+        missing_any = True
 
-# Predictions Sample
-@st.cache_data
-def load_store_sample():
-    return load_pickle("store1_weekly_predictions.csv")
+if missing_any:
+    st.warning("⚠️ Model or required artifacts missing. Please verify uploaded files.")
+    st.stop()
 
+# -----------------------------------------------------
+# SECTION 1 — Prediction
+# -----------------------------------------------------
+st.header("🛒 Store Sales Prediction using LightGBM")
 
-# -------------------------------------------------------
-#   MAIN APP UI
-# -------------------------------------------------------
+st.write("Model loaded successfully. Preview sample input data:")
+st.dataframe(sample_df.head())
 
-st.title("📈 Demand Planning & Forecasting System")
-st.markdown("#### Machine Learning Driven Forecasting for Retail & FMCG")
+# Predict Button
+if st.button("Run Forecast Now"):
+    try:
+        X = sample_df[features]
+        preds = model.predict(X)
+        sample_df["Forecast"] = preds
+        st.success("Prediction Completed Successfully!")
+        st.dataframe(sample_df[["Forecast"]].head(10))
+    except Exception as e:
+        st.error(f"Prediction failed: {e}")
 
-menu = st.sidebar.radio(
-    "Navigation",
-    ["Forecast", "Model & Metrics Overview"]
-)
+# -----------------------------------------------------
+# SECTION 2 — Full Comparison
+# -----------------------------------------------------
+st.header("📊 Full Model Metrics Comparison")
 
-# -------------------------------------------------------
-# PAGE 1 - FORECAST VIEW
-# -------------------------------------------------------
-if menu == "Forecast":
-    st.subheader("🛍 Store Sales Prediction using LightGBM")
+cols = st.columns(2)
 
-    model = load_model()
-    feature_cols = load_features()
-    sample_df = load_store_sample()
-
-    if model is None or feature_cols is None or sample_df is None:
-        st.warning("⚠ Model or required artifacts missing. Please verify uploaded files.")
+# ------------ Baseline
+with cols[0]:
+    st.subheader("📌 Baseline (Naive Model) Metrics")
+    if baseline_metrics:
+        st.json(baseline_metrics)
     else:
-        st.success("Model loaded successfully! 👌")
+        missing(BASELINE_METRICS_PATH)
 
-        stores = sorted(sample_df["Store"].unique().tolist())
-        store_id = st.selectbox("Select Store:", stores)
+# ------------ ARIMA
+with cols[1]:
+    st.subheader("🔷 ARIMA Metrics")
+    if arima_metrics:
+        st.json(arima_metrics)
+    else:
+        missing(ARIMA_METRICS_PATH)
 
-        store_data = (
-            sample_df[sample_df["Store"] == store_id]
-            [["Date", "LGB_Pred"]]
-        )
+# ------------ SARIMA
+with cols[0]:
+    st.subheader("🔵 SARIMA Metrics")
+    if sarima_metrics:
+        st.json(sarima_metrics)
+    else:
+        missing(SARIMA_METRICS_PATH)
 
-        store_data["Date"] = pd.to_datetime(store_data["Date"])
+# ------------ LightGBM
+with cols[1]:
+    st.subheader("⚡ LightGBM Metrics")
+    if lightgbm_metrics:
+        st.json(lightgbm_metrics)
+    else:
+        missing(LGBM_METRICS_PATH)
 
-        st.line_chart(
-            store_data.set_index("Date")["LGB_Pred"],
-            height=400
-        )
+# -----------------------------------------------------
+# SECTION 3 — Model Selection
+# -----------------------------------------------------
+st.header("🧠 Best Performing Model")
 
-        st.write(f"📌 Showing LightGBM forecast for Store **{store_id}**")
-
-# -------------------------------------------------------
-# PAGE 2 - METRICS OVERVIEW
-# -------------------------------------------------------
-elif menu == "Model & Metrics Overview":
-    st.subheader("📊 Full Model Metrics Comparison")
-
-    col1, col2 = st.columns(2)
-
-    # Baseline Metrics
-    with col1:
-        st.markdown("### 📌 Baseline (Naive Model) Metrics")
-        baseline = load_baseline_metrics()
-        st.write(baseline if baseline is not None else "No metrics found.")
-
-    # ARIMA
-    with col2:
-        st.markdown("### 🔁 ARIMA Metrics")
-        arima = load_arima_metrics()
-        st.write(arima if arima is not None else "No metrics found.")
-
-    col3, col4 = st.columns(2)
-
-    # SARIMA
-    with col3:
-        st.markdown("### 🌀 SARIMA Metrics")
-        sarima = load_sarima_metrics()
-        st.write(sarima if sarima is not None else "No metrics found.")
-
-    # LightGBM
-    with col4:
-        st.markdown("### ⚡ LightGBM Metrics")
-        lgbm = load_lgbm_metrics()
-        st.write(lgbm if lgbm is not None else "No metrics found.")
-
-    st.divider()
-    st.markdown("### 🧠 Best Performing Model")
-    st.success("Based on evaluation metrics, **LightGBM** achieved the strongest forecasting performance.")
+st.success(
+    "Based on evaluation metrics, **LightGBM** achieved the strongest forecasting performance."
+)
