@@ -1,0 +1,74 @@
+# ----------------------------
+# Python + Data Science
+# ----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.pickle
+*.h5
+*.joblib
+.DS_Store
+
+# Virtual env
+venv/
+env/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+logs/
+
+# Bytecode & temp
+*.swp
+*.swo
+*.tmp
+*.temp
+
+# OS-generated files
+Thumbs.db
+desktop.ini
+
+# Cache
+.cache/
+*.cache/
+pip-wheel-metadata/
+
+# Testing
+.tox/
+.coverage
+pytest_cache/
+.pytest_cache/
+
+# Build folders
+build/
+dist/
+
+# ----------------------------
+# Project-specific ignores
+# ----------------------------
+
+# 🚫 Raw or full datasets (huge files)
+data/raw/
+data/full/
+
+# Temporary processed test/EDA samples
+data/temp/
+
+# Model experiment outputs
+models/
+experiments/
+
+# Intermediate exports (optional)
+exports/
+artifacts/
+
+# Deployment auto caches
+streamlit/
+
+# Exclude model training notebooks (if too large)
+notebooks/archive/
