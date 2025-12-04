@@ -1,181 +1,138 @@
 import streamlit as st
 import pandas as pd
 import pickle
-import matplotlib.pyplot as plt
+import base64
 
-# ==========================================
-# Helper: Load Pickle safely
-# ==========================================
-def load_pickle(path):
+# -------------------------------------------------------
+#  CONFIG
+# -------------------------------------------------------
+DEPLOY_DIR = "."   # Since app runs inside deployment folder on Streamlit Cloud
+st.set_page_config(page_title="Demand Forecasting System", layout="wide")
+
+# -------------------------------------------------------
+#  LOADER HELPERS (CACHED)
+# -------------------------------------------------------
+@st.cache_data
+def load_pickle(file_name):
+    file_path = f"{DEPLOY_DIR}/{file_name}"
     try:
-        with open(path, "rb") as f:
+        with open(file_path, "rb") as f:
             return pickle.load(f)
-    except Exception as e:
-        st.error(f"Failed to load {path}: {e}")
+    except FileNotFoundError:
+        st.error(f"❌ Missing file: `{file_name}`")
         return None
 
-# ==========================================
-# Load Assets
-# ==========================================
+# Model
 @st.cache_data
-def load_all():
-    data = {}
+def load_model():
+    return load_pickle("lightgbm_model.pkl")
 
-    # Models
-    data["model"] = load_pickle("lightgbm_model.pkl")
-    data["features"] = load_pickle("feature_columns.pkl")
+# Feature Columns
+@st.cache_data
+def load_features():
+    return load_pickle("feature_columns.pkl")
 
-    # Metrics
-    data["baseline_m"] = load_pickle("baseline_metrics.pkl")
-    data["arima_m"] = load_pickle("arima_metrics.pkl")
-    data["sarima_m"] = load_pickle("sarima_metrics.pkl")
-    data["lgb_m"] = load_pickle("lightgbm_metrics.pkl")
+# Metrics
+@st.cache_data
+def load_baseline_metrics():
+    return load_pickle("baseline_metrics.pkl")
 
-    # Predictions
-    data["store_pred"] = pd.read_csv("store1_weekly_predictions.csv")
-    data["test_pred"] = pd.read_csv("lightgbm_test_forecast.csv")
-    data["baseline_pred"] = pd.read_csv("baseline_weekly_predictions.csv")
+@st.cache_data
+def load_arima_metrics():
+    return load_pickle("arima_metrics.pkl")
 
-    return data
+@st.cache_data
+def load_sarima_metrics():
+    return load_pickle("sarima_metrics.pkl")
 
-data = load_all()
+@st.cache_data
+def load_lgbm_metrics():
+    return load_pickle("lightgbm_metrics.pkl")
 
-# ==========================================
-# Sidebar Navigation
-# ==========================================
-selected = st.sidebar.selectbox(
-    "🔍 Navigate",
-    [
-        "📈 Weekly Forecast",
-        "📊 Metrics Dashboard",
-        "🧪 Test Forecast Evaluation",
-        "🧠 SHAP Explainability"
-    ]
+# Predictions Sample
+@st.cache_data
+def load_store_sample():
+    return load_pickle("store1_weekly_predictions.csv")
+
+
+# -------------------------------------------------------
+#   MAIN APP UI
+# -------------------------------------------------------
+
+st.title("📈 Demand Planning & Forecasting System")
+st.markdown("#### Machine Learning Driven Forecasting for Retail & FMCG")
+
+menu = st.sidebar.radio(
+    "Navigation",
+    ["Forecast", "Model & Metrics Overview"]
 )
 
-# ==========================================
-# Page: Weekly Forecast
-# ==========================================
-if selected == "📈 Weekly Forecast":
-    st.title("📈 Weekly Demand Forecast — LightGBM")
-    st.write("Predicting store-level weekly demand using trained LightGBM Model.")
+# -------------------------------------------------------
+# PAGE 1 - FORECAST VIEW
+# -------------------------------------------------------
+if menu == "Forecast":
+    st.subheader("🛍 Store Sales Prediction using LightGBM")
 
-    df = data["store_pred"]
+    model = load_model()
+    feature_cols = load_features()
+    sample_df = load_store_sample()
 
-    st.subheader("🔮 Forecast Output Preview")
-    st.dataframe(df.head(), use_container_width=True)
+    if model is None or feature_cols is None or sample_df is None:
+        st.warning("⚠ Model or required artifacts missing. Please verify uploaded files.")
+    else:
+        st.success("Model loaded successfully! 👌")
 
-    st.subheader("📅 Prediction Chart")
-    fig, ax = plt.subplots()
-    ax.plot(df["week"], df["prediction"], label="Predicted Demand")
-    ax.set_xlabel("Week")
-    ax.set_ylabel("Units Sold")
-    ax.set_title("Weekly Demand Predictions")
-    ax.legend()
-    st.pyplot(fig)
+        stores = sorted(sample_df["Store"].unique().tolist())
+        store_id = st.selectbox("Select Store:", stores)
 
+        store_data = (
+            sample_df[sample_df["Store"] == store_id]
+            [["Date", "LGB_Pred"]]
+        )
 
+        store_data["Date"] = pd.to_datetime(store_data["Date"])
 
-# ==========================================
-# Page: Metrics Dashboard
-# ==========================================
-if selected == "📊 Metrics Dashboard":
-    st.title("📊 Model Performance Metrics Dashboard")
+        st.line_chart(
+            store_data.set_index("Date")["LGB_Pred"],
+            height=400
+        )
 
-    baseline = data["baseline_m"]
-    arima = data["arima_m"]
-    sarima = data["sarima_m"]
-    lgb = data["lgb_m"]
+        st.write(f"📌 Showing LightGBM forecast for Store **{store_id}**")
 
-    if not baseline:
-        st.warning("Metrics could not be loaded. Ensure files exist.")
-        st.stop()
+# -------------------------------------------------------
+# PAGE 2 - METRICS OVERVIEW
+# -------------------------------------------------------
+elif menu == "Model & Metrics Overview":
+    st.subheader("📊 Full Model Metrics Comparison")
 
-    # KPIs
-    st.subheader("⚡ RMSE Comparison — Lower is Better")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
 
-    col1.metric("Baseline RMSE", f"{baseline['rmse']:.2f}")
-    col2.metric("ARIMA RMSE", f"{arima['rmse']:.2f}")
-    col3.metric("SARIMA RMSE", f"{sarima['rmse']:.2f}")
-    col4.metric("LightGBM RMSE", f"{lgb['rmse']:.2f}")
+    # Baseline Metrics
+    with col1:
+        st.markdown("### 📌 Baseline (Naive Model) Metrics")
+        baseline = load_baseline_metrics()
+        st.write(baseline if baseline is not None else "No metrics found.")
 
-    # Table
-    metrics_df = pd.DataFrame({
-        "Model": ["Baseline", "ARIMA", "SARIMA", "LightGBM"],
-        "MAE": [baseline["mae"], arima["mae"], sarima["mae"], lgb["mae"]],
-        "RMSE": [baseline["rmse"], arima["rmse"], sarima["rmse"], lgb["rmse"]],
-        "MAPE": [baseline["mape"], arima["mape"], sarima["mape"], lgb["mape"]],
-    })
+    # ARIMA
+    with col2:
+        st.markdown("### 🔁 ARIMA Metrics")
+        arima = load_arima_metrics()
+        st.write(arima if arima is not None else "No metrics found.")
 
-    st.subheader("📊 Detailed Comparison Table")
-    st.dataframe(metrics_df, use_container_width=True)
+    col3, col4 = st.columns(2)
 
-    # Best Model
-    best_row = metrics_df.loc[metrics_df["RMSE"].idxmin()]
-    st.success(
-        f"🏆 Best Model: **{best_row['Model']}** "
-        f"with RMSE: **{best_row['RMSE']:.2f}** and MAE: **{best_row['MAE']:.2f}**"
-    )
+    # SARIMA
+    with col3:
+        st.markdown("### 🌀 SARIMA Metrics")
+        sarima = load_sarima_metrics()
+        st.write(sarima if sarima is not None else "No metrics found.")
 
-    # RMSE Bar Plot
-    st.subheader("📉 RMSE Visualization")
-    fig2, ax2 = plt.subplots()
-    ax2.bar(metrics_df["Model"], metrics_df["RMSE"])
-    ax2.set_title("RMSE Comparison Chart")
-    ax2.set_ylabel("RMSE")
-    st.pyplot(fig2)
+    # LightGBM
+    with col4:
+        st.markdown("### ⚡ LightGBM Metrics")
+        lgbm = load_lgbm_metrics()
+        st.write(lgbm if lgbm is not None else "No metrics found.")
 
-
-
-# ==========================================
-# Page: Test Forecast Evaluation
-# ==========================================
-if selected == "🧪 Test Forecast Evaluation":
-    st.title("🧪 LightGBM Test Forecast Results")
-
-    df_test = data["test_pred"]
-    st.dataframe(df_test.head(), use_container_width=True)
-
-    st.subheader("📉 Forecast vs Actual Plot")
-    fig3, ax3 = plt.subplots()
-    ax3.plot(df_test["week"], df_test["actual"], label="Actual", color="green")
-    ax3.plot(df_test["week"], df_test["forecast"], label="Predicted", linestyle="--")
-    ax3.set_xlabel("Week")
-    ax3.set_ylabel("Units Sold")
-    ax3.set_title("Actual vs Predicted")
-    ax3.legend()
-    st.pyplot(fig3)
-
-
-
-# ==========================================
-# Page: SHAP Explainability
-# ==========================================
-if selected == "🧠 SHAP Explainability":
-    st.title("🧠 SHAP Feature Importance (Global)")
-
-    try:
-        import shap
-        shap.initjs()
-    except:
-        st.error("SHAP is not installed. Add `shap` in requirements.txt")
-        st.stop()
-
-    model = data["model"]
-    cols = data["features"]
-
-    if model is None or cols is None:
-        st.error("Model or feature columns missing.")
-        st.stop()
-
-    st.info("Loading SHAP values... please wait ⏳")
-
-    sample_data = data["store_pred"][cols].head(200)
-
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(sample_data)
-
-    st.subheader("🔥 SHAP Summary Plot")
-    fig_shap = shap.summary_plot(shap_values, sample_data, show=False)
-    st.pyplot(bbox_inches="tight")
+    st.divider()
+    st.markdown("### 🧠 Best Performing Model")
+    st.success("Based on evaluation metrics, **LightGBM** achieved the strongest forecasting performance.")
