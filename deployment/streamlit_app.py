@@ -2,7 +2,9 @@ import os
 import joblib
 import pickle
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Ensure streamlit ALWAYS targets the deployment folder
+APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.join(APP_ROOT, "deployment")
 
 def path(file_name):
     return os.path.join(BASE_DIR, file_name)
@@ -32,7 +34,6 @@ def load_val_predictions():
 @st.cache_data
 def load_metrics():
     return joblib.load(path("lightgbm_metrics.pkl"))
-
 
 # ================================
 # Load items
