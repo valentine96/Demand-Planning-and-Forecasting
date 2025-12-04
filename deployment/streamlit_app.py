@@ -1,26 +1,17 @@
-import streamlit as st
-import pandas as pd
-import joblib
 import os
+import joblib
+import pickle
 
-# ================================
-# Resolve correct deployment path
-# ================================
-
-# Get directory of this app file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# All files live next to this file in same folder
 def path(file_name):
     return os.path.join(BASE_DIR, file_name)
 
-
-# ================================
-# Cached Loaders
-# ================================
 @st.cache_resource
 def load_model():
-    return joblib.load(path("lightgbm_model.pkl"))
+    with open(path("lightgbm_model.pkl"), "rb") as f:
+        model = pickle.load(f)
+    return model
 
 @st.cache_data
 def load_feature_columns():
@@ -33,6 +24,14 @@ def load_weekly_predictions():
 @st.cache_data
 def load_test_forecast():
     return pd.read_csv(path("lightgbm_test_forecast.csv"))
+
+@st.cache_data
+def load_val_predictions():
+    return pd.read_csv(path("lightgbm_val_predictions.csv"))
+
+@st.cache_data
+def load_metrics():
+    return joblib.load(path("lightgbm_metrics.pkl"))
 
 
 # ================================
