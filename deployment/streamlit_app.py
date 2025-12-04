@@ -1,93 +1,163 @@
 import os
-import joblib
 import pickle
+import pandas as pd
+import streamlit as st
 
-st.write("Working directory:", os.getcwd())
-st.write("Expected deployment path:", BASE_DIR)
-st.write("Files found:", os.listdir(BASE_DIR))
+# ============================================================
+# Resolve deployment folder path
+# ============================================================
+DEPLOY_DIR = os.path.dirname(__file__)
 
-# Ensure streamlit ALWAYS targets the deployment folder
-APP_ROOT = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.join(APP_ROOT, "deployment")
+def file_path(name: str) -> str:
+    return os.path.join(DEPLOY_DIR, name)
 
-def path(file_name):
-    return os.path.join(BASE_DIR, file_name)
 
-@st.cache_resource
+# ============================================================
+# Cached Loaders
+# ============================================================
+@st.cache_data
 def load_model():
-    with open(path("lightgbm_model.pkl"), "rb") as f:
-        model = pickle.load(f)
-    return model
+    path = file_path("lightgbm_model.pkl")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Model file not found at: {path}")
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
 
 @st.cache_data
-def load_feature_columns():
-    return joblib.load(path("feature_columns.pkl"))
+def load_features():
+    path = file_path("feature_columns.pkl")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Feature file not found at: {path}")
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
-@st.cache_data
-def load_weekly_predictions():
-    return pd.read_csv(path("baseline_weekly_predictions.csv"))
-
-@st.cache_data
-def load_test_forecast():
-    return pd.read_csv(path("lightgbm_test_forecast.csv"))
-
-@st.cache_data
-def load_val_predictions():
-    return pd.read_csv(path("lightgbm_val_predictions.csv"))
 
 @st.cache_data
 def load_metrics():
-    return joblib.load(path("lightgbm_metrics.pkl"))
+    metrics = {}
+    files = {
+        "LightGBM": "lightgbm_metrics.pkl",
+        "SARIMA": "sarima_metrics.pkl",
+        "ARIMA": "arima_metrics.pkl",
+        "Baseline": "baseline_metrics.pkl"
+    }
+    for model_name, filename in files.items():
+        path = file_path(filename)
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                metrics[model_name] = pickle.load(f)
+        else:
+            metrics[model_name] = {"Error": f"{filename} file missing"}
+    return metrics
 
-# ================================
-# Load items
-# ================================
+
+@st.cache_data
+def load_samples():
+    samples = {}
+    files = {
+        "LightGBM Test Forecast": "lightgbm_test_forecast.csv",
+        "LightGBM Validation Predictions": "lightgbm_val_predictions.csv",
+        "Baseline Weekly Predictions": "baseline_weekly_predictions.csv",
+        "Store1 Weekly Predictions": "store1_weekly_predictions.csv"
+    }
+    for label, filename in files.items():
+        path = file_path(filename)
+        if os.path.exists(path):
+            samples[label] = pd.read_csv(path)
+        else:
+            samples[label] = pd.DataFrame({"Error": [f"{filename} missing"]})
+    return samples
+
+
+# ============================================================
+# Page UI
+# ============================================================
+st.set_page_config(
+    page_title="Demand Planning & Forecasting System",
+    layout="wide",
+)
+
+st.title("📊 Demand Planning & Forecasting System")
+st.markdown(
+    "#### Machine Learning–Driven Forecasting for Retail & FMCG"
+)
+
+# ============================================================
+# Debug (Temporary)
+# ============================================================
+with st.expander("🛠 DEBUG: File Listing (Temporary)"):
+    try:
+        st.write("Deployment directory:", DEPLOY_DIR)
+        st.write("Files in deployment folder:", os.listdir(DEPLOY_DIR))
+    except Exception as e:
+        st.error(f"Error listing files: {e}")
+
+
+# ============================================================
+# Load all critical data
+# ============================================================
+
 try:
     model = load_model()
-    feature_cols = load_feature_columns()
-    weekly_forecast = load_weekly_predictions()
-    test_forecast = load_test_forecast()
+    features = load_features()
+    metrics = load_metrics()
+    samples = load_samples()
 except Exception as e:
-    st.error(f"⚠️ Failed to load model or files.\n\nDetails: {e}")
+    st.error(f"⚠ Critical Error Loading Artifacts:\n\n{e}")
     st.stop()
 
 
-# ================================
-# UI
-# ================================
-st.title("📊 Demand Planning & Forecasting System")
-st.caption("Machine Learning Driven Forecasting for Retail & FMCG")
-
-st.sidebar.header("🔍 Store Selection")
-
-stores = sorted(weekly_forecast["Store"].unique())
-selected_store = st.sidebar.selectbox("Select Store:", stores)
-
-
-# Filter results for chosen store
-store_weekly = weekly_forecast[weekly_forecast["Store"] == selected_store]
-store_test = test_forecast[test_forecast["Id"].astype(str).str.startswith(str(selected_store))]
-
-
-# ================================
-# Display Weekly Forecast
-# ================================
-st.subheader(f"📅 Model Weekly Forecast — Store {selected_store}")
-
-st.line_chart(
-    store_weekly.set_index("Date")["LGB_Pred"],
-    use_container_width=True
+# ============================================================
+# UI Navigation Tabs
+# ============================================================
+tab1, tab2, tab3 = st.tabs(
+    ["📈 Metrics Dashboard", "🧪 Sample Predictions", "🔍 Model Inputs"]
 )
 
 
-# ================================
-# Show sample forecasted test values
-# ================================
-st.subheader(f"🧠 Forecasted Values For Test Horizon — Store {selected_store}")
+# ============================================================
+# Metrics Tab
+# ============================================================
+with tab1:
+    st.subheader("📈 Model Performance Comparison")
 
-st.dataframe(
-    store_test.head(10),
-    use_container_width=True
-)
+    for model_name, result in metrics.items():
+        st.markdown(f"### {model_name}")
 
-st.success("Model and forecasts loaded successfully!")
+        if isinstance(result, dict):
+            df = pd.DataFrame.from_dict(result, orient="index", columns=["Value"])
+            st.table(df)
+        else:
+            st.warning(f"Metrics format issue for {model_name}")
+
+        st.divider()
+
+
+# ============================================================
+# Predictions Tab
+# ============================================================
+with tab2:
+    st.subheader("🧪 Prediction Samples")
+
+    for title, df in samples.items():
+        st.markdown(f"### {title}")
+        st.dataframe(df.head(20), use_container_width=True)
+        st.divider()
+
+
+# ============================================================
+# Features Tab
+# ============================================================
+with tab3:
+    st.subheader("🔍 Model Feature Set")
+
+    st.markdown("**Loaded Feature Columns Used by LightGBM Model:**")
+    st.write(features)
+
+    st.info(
+        """
+        These are the engineered features used to train the LightGBM model.  
+        Ensure all incoming data during inference contains these fields.
+        """
+    )
