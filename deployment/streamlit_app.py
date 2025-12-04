@@ -2,6 +2,10 @@ import os
 import joblib
 import pickle
 
+st.write("Working directory:", os.getcwd())
+st.write("Expected deployment path:", BASE_DIR)
+st.write("Files found:", os.listdir(BASE_DIR))
+
 # Ensure streamlit ALWAYS targets the deployment folder
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(APP_ROOT, "deployment")
