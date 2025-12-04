@@ -1,154 +1,89 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import pickle
+import joblib
 import os
-import matplotlib.pyplot as plt
 
-# -----------------------------
-# CONFIG
-# -----------------------------
-DEPLOY_PATH = "deployment"
+# ================================
+# Resolve correct deployment path
+# ================================
 
+# Get directory of this app file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# -----------------------------
-# HELPER: Validate File Paths
-# -----------------------------
-def assert_file(path):
-    if not os.path.exists(path):
-        st.error(f"❌ Missing required file: `{path}`")
-        st.stop()
+# All files live next to this file in same folder
+def path(file_name):
+    return os.path.join(BASE_DIR, file_name)
 
 
-# -----------------------------
-# HELPER: Load Pickle Files
-# -----------------------------
+# ================================
+# Cached Loaders
+# ================================
 @st.cache_resource
-def load_pickle(filename):
-    path = os.path.join(DEPLOY_PATH, filename)
-    assert_file(path)
-    with open(path, "rb") as f:
-        return pickle.load(f)
+def load_model():
+    return joblib.load(path("lightgbm_model.pkl"))
 
-
-# -----------------------------
-# HELPER: Load CSV Files
-# -----------------------------
 @st.cache_data
-def load_csv(filename):
-    path = os.path.join(DEPLOY_PATH, filename)
-    assert_file(path)
-    return pd.read_csv(path)
+def load_feature_columns():
+    return joblib.load(path("feature_columns.pkl"))
+
+@st.cache_data
+def load_weekly_predictions():
+    return pd.read_csv(path("baseline_weekly_predictions.csv"))
+
+@st.cache_data
+def load_test_forecast():
+    return pd.read_csv(path("lightgbm_test_forecast.csv"))
 
 
-# -----------------------------
-# LOAD ALL ARTIFACTS
-# -----------------------------
-model = load_pickle("lightgbm_model.pkl")
-metrics_lgb = load_pickle("lightgbm_metrics.pkl")
-metrics_baseline = load_pickle("baseline_metrics.pkl")
-metrics_arima = load_pickle("arima_metrics.pkl")
-metrics_sarima = load_pickle("sarima_metrics.pkl")
-
-feature_cols = load_pickle("feature_columns.pkl")
-
-test_predictions = load_csv("lightgbm_test_forecast.csv")
-baseline_results = load_csv("baseline_weekly_predictions.csv")
-store1_results = load_csv("store1_weekly_predictions.csv")
+# ================================
+# Load items
+# ================================
+try:
+    model = load_model()
+    feature_cols = load_feature_columns()
+    weekly_forecast = load_weekly_predictions()
+    test_forecast = load_test_forecast()
+except Exception as e:
+    st.error(f"⚠️ Failed to load model or files.\n\nDetails: {e}")
+    st.stop()
 
 
-# -----------------------------
-# PAGE HEADER
-# -----------------------------
-st.set_page_config(page_title="Demand Forecasting System", layout="wide")
-
+# ================================
+# UI
+# ================================
 st.title("📊 Demand Planning & Forecasting System")
-st.write("Machine Learning Driven Forecasting for Retail & FMCG")
+st.caption("Machine Learning Driven Forecasting for Retail & FMCG")
+
+st.sidebar.header("🔍 Store Selection")
+
+stores = sorted(weekly_forecast["Store"].unique())
+selected_store = st.sidebar.selectbox("Select Store:", stores)
 
 
-# -----------------------------
-# SIDEBAR
-# -----------------------------
-st.sidebar.header("Navigation")
+# Filter results for chosen store
+store_weekly = weekly_forecast[weekly_forecast["Store"] == selected_store]
+store_test = test_forecast[test_forecast["Id"].astype(str).str.startswith(str(selected_store))]
 
-page = st.sidebar.radio(
-    "Choose a view:",
-    ("📈 LightGBM Predictions", "🏪 Store Forecast Visualization", "📀 Model Performance Metrics"),
+
+# ================================
+# Display Weekly Forecast
+# ================================
+st.subheader(f"📅 Model Weekly Forecast — Store {selected_store}")
+
+st.line_chart(
+    store_weekly.set_index("Date")["LGB_Pred"],
+    use_container_width=True
 )
 
 
-# -----------------------------
-# PAGE 1: LightGBM TEST SET RESULTS
-# -----------------------------
-if page == "📈 LightGBM Predictions":
-    st.subheader("LightGBM Test Set Forecast Results")
-    st.dataframe(test_predictions.head(20))
+# ================================
+# Show sample forecasted test values
+# ================================
+st.subheader(f"🧠 Forecasted Values For Test Horizon — Store {selected_store}")
 
-    st.download_button(
-        label="⬇ Download Full Forecast",
-        data=test_predictions.to_csv(index=False),
-        file_name="lightgbm_test_forecast.csv",
-        mime="text/csv"
-    )
+st.dataframe(
+    store_test.head(10),
+    use_container_width=True
+)
 
-    st.success("✔ Forecast loaded successfully.")
-
-
-# -----------------------------
-# PAGE 2: STORE VISUALIZATION
-# -----------------------------
-elif page == "🏪 Store Forecast Visualization":
-    st.subheader("Store-Level Forecast Visualization")
-
-    stores_available = sorted(test_predictions["Id"].unique())
-    selected_store = st.selectbox("Select Store ID:", stores_available)
-
-    df = store1_results.copy()
-    df = df[df["Store"] == selected_store].copy()
-
-    if df.empty:
-        st.warning(f"No prediction data found for Store {selected_store}.")
-    else:
-        df["Date"] = pd.to_datetime(df["Date"])
-
-        fig = plt.figure(figsize=(12, 5))
-        plt.plot(df["Date"], df["LGB_Pred"], label=f"LightGBM Store {selected_store}", linewidth=2)
-        plt.title(f"Store {selected_store} - LightGBM Forecast")
-        plt.xlabel("Date")
-        plt.ylabel("Predicted Sales")
-        plt.grid(True, linestyle="--", alpha=0.4)
-        plt.legend()
-        st.pyplot(fig)
-
-
-# -----------------------------
-# PAGE 3: MODEL METRICS
-# -----------------------------
-elif page == "📀 Model Performance Metrics":
-    st.subheader("Model Evaluation Metrics")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### 🚀 LightGBM Metrics")
-        st.json(metrics_lgb)
-
-        st.markdown("### 🧪 ARIMA Metrics")
-        st.json(metrics_arima)
-
-    with col2:
-        st.markdown("### 📉 Baseline Metrics")
-        st.json(metrics_baseline)
-
-        st.markdown("### ⏳ SARIMA Metrics")
-        st.json(metrics_sarima)
-
-    st.info("These metrics were computed during model development.")
-
-
-# -----------------------------
-# FOOTER
-# -----------------------------
-st.markdown("---")
-st.markdown("📌 Built for Demand Planning & Forecasting Capstone Project")
-st.markdown("🧠 Powered by Machine Learning")
+st.success("Model and forecasts loaded successfully!")
