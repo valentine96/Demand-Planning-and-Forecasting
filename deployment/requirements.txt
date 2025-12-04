@@ -2,5 +2,8 @@ streamlit
 pandas
 numpy
 lightgbm
-scikit-learn
+pickle5
 joblib
+scikit-learn
+matplotlib
+shap
