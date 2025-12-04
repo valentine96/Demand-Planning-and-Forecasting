@@ -2,175 +2,153 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-from datetime import datetime
+import os
+import matplotlib.pyplot as plt
 
-# ==============================================
-# Load Model + Feature Columns + Metrics
-# ==============================================
+# -----------------------------
+# CONFIG
+# -----------------------------
+DEPLOY_PATH = "deployment"
+
+
+# -----------------------------
+# HELPER: Validate File Paths
+# -----------------------------
+def assert_file(path):
+    if not os.path.exists(path):
+        st.error(f"❌ Missing required file: `{path}`")
+        st.stop()
+
+
+# -----------------------------
+# HELPER: Load Pickle Files
+# -----------------------------
+@st.cache_resource
+def load_pickle(filename):
+    path = os.path.join(DEPLOY_PATH, filename)
+    assert_file(path)
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
+# -----------------------------
+# HELPER: Load CSV Files
+# -----------------------------
 @st.cache_data
-def load_model():
-    with open("lightgbm_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    return model
-
-@st.cache_data
-def load_features():
-    with open("feature_columns.pkl", "rb") as f:
-        features = pickle.load(f)
-    return features
-
-@st.cache_data
-def load_metrics():
-    try:
-        with open("lightgbm_metrics.pkl", "rb") as f:
-            metrics = pickle.load(f)
-    except:
-        metrics = None
-    return metrics
+def load_csv(filename):
+    path = os.path.join(DEPLOY_PATH, filename)
+    assert_file(path)
+    return pd.read_csv(path)
 
 
-# ==============================================
-# Load Sample Data (store processed small)
-# This ensures real alignment when predicting
-# ==============================================
-@st.cache_data
-def load_sample_data():
-    try:
-        df = pd.read_csv("store_processed_small.csv")
-        df["Date"] = pd.to_datetime(df["Date"])
-        return df
-    except:
-        return None
+# -----------------------------
+# LOAD ALL ARTIFACTS
+# -----------------------------
+model = load_pickle("lightgbm_model.pkl")
+metrics_lgb = load_pickle("lightgbm_metrics.pkl")
+metrics_baseline = load_pickle("baseline_metrics.pkl")
+metrics_arima = load_pickle("arima_metrics.pkl")
+metrics_sarima = load_pickle("sarima_metrics.pkl")
+
+feature_cols = load_pickle("feature_columns.pkl")
+
+test_predictions = load_csv("lightgbm_test_forecast.csv")
+baseline_results = load_csv("baseline_weekly_predictions.csv")
+store1_results = load_csv("store1_weekly_predictions.csv")
 
 
-# ==============================================
-# Helper: Make Forecast on any date/store
-# ==============================================
-def build_input_row(df, store_id, target_date):
-    """
-    We extract the latest record before the target_date,
-    and reuse its engineered features.
-    """
-    base = df[df["Store"] == store_id].copy()
-
-    if base.empty:
-        return None
-
-    # pick latest record
-    latest = base.sort_values("Date").iloc[-1]
-
-    new_row = latest.copy()
-    new_row["Date"] = target_date
-
-    # If lag features exist (lag_7, lag_14,...), estimate them
-    date_diffs = (target_date - latest["Date"]).days
-    for col in df.columns:
-        if col.startswith("lag_"):
-            try:
-                lag_days = int(col.split("_")[1])
-                new_row[col] = base.sort_values("Date")["Sales"].iloc[-lag_days] \
-                               if len(base) > lag_days else new_row["Sales"]
-            except:
-                pass
-
-    return new_row.to_frame().T
-
-
-# ==============================================
-# STREAMLIT UI
-# ==============================================
-st.set_page_config(
-    page_title="Demand Forecasting System",
-    page_icon="📈",
-    layout="centered"
-)
+# -----------------------------
+# PAGE HEADER
+# -----------------------------
+st.set_page_config(page_title="Demand Forecasting System", layout="wide")
 
 st.title("📊 Demand Planning & Forecasting System")
-st.markdown("Machine Learning Driven Forecasting for Retail & FMCG")
-
-model = load_model()
-features = load_features()
-metrics = load_metrics()
-sample_df = load_sample_data()
+st.write("Machine Learning Driven Forecasting for Retail & FMCG")
 
 
-# ==============================================
-# Sidebar Inputs
-# ==============================================
-with st.sidebar:
-    st.header("🔧 Forecast Inputs")
+# -----------------------------
+# SIDEBAR
+# -----------------------------
+st.sidebar.header("Navigation")
 
-    if sample_df is not None:
-        store_options = sorted(sample_df["Store"].unique().tolist())
-    else:
-        store_options = []
+page = st.sidebar.radio(
+    "Choose a view:",
+    ("📈 LightGBM Predictions", "🏪 Store Forecast Visualization", "📀 Model Performance Metrics"),
+)
 
-    store_id = st.selectbox("Select Store ID", store_options)
 
-    target_date = st.date_input(
-        "Select Forecast Date",
-        datetime(2015, 9, 1),
-        min_value=datetime(2015, 7, 1),
-        max_value=datetime(2016, 12, 31)
+# -----------------------------
+# PAGE 1: LightGBM TEST SET RESULTS
+# -----------------------------
+if page == "📈 LightGBM Predictions":
+    st.subheader("LightGBM Test Set Forecast Results")
+    st.dataframe(test_predictions.head(20))
+
+    st.download_button(
+        label="⬇ Download Full Forecast",
+        data=test_predictions.to_csv(index=False),
+        file_name="lightgbm_test_forecast.csv",
+        mime="text/csv"
     )
 
+    st.success("✔ Forecast loaded successfully.")
 
-# ==============================================
-# Predict Button
-# ==============================================
-if st.button("Generate Forecast"):
-    if sample_df is None:
-        st.error("❗ Missing sample data file: store_processed_small.csv")
+
+# -----------------------------
+# PAGE 2: STORE VISUALIZATION
+# -----------------------------
+elif page == "🏪 Store Forecast Visualization":
+    st.subheader("Store-Level Forecast Visualization")
+
+    stores_available = sorted(test_predictions["Id"].unique())
+    selected_store = st.selectbox("Select Store ID:", stores_available)
+
+    df = store1_results.copy()
+    df = df[df["Store"] == selected_store].copy()
+
+    if df.empty:
+        st.warning(f"No prediction data found for Store {selected_store}.")
     else:
-        input_row = build_input_row(sample_df, store_id, pd.to_datetime(target_date))
+        df["Date"] = pd.to_datetime(df["Date"])
 
-        if input_row is None:
-            st.error("No historical data found for this store.")
-        else:
-            X = input_row[features]
-            pred = model.predict(X)[0]
-
-            st.success(f"💡 Forecasted Sales for Store **{store_id}** on **{target_date}**:")
-            st.metric(label="Predicted Sales", value=f"{pred:,.0f}")
-
-            # Add small trend series
-            history = (
-                sample_df[sample_df["Store"] == store_id]
-                .sort_values("Date")
-                .tail(20)
-            )
-            history["Forecast"] = np.nan
-            history.loc[history.index[-1], "Forecast"] = pred
-
-            st.line_chart(
-                history.set_index("Date")[["Sales", "Forecast"]],
-                height=350
-            )
+        fig = plt.figure(figsize=(12, 5))
+        plt.plot(df["Date"], df["LGB_Pred"], label=f"LightGBM Store {selected_store}", linewidth=2)
+        plt.title(f"Store {selected_store} - LightGBM Forecast")
+        plt.xlabel("Date")
+        plt.ylabel("Predicted Sales")
+        plt.grid(True, linestyle="--", alpha=0.4)
+        plt.legend()
+        st.pyplot(fig)
 
 
-# ==============================================
-# Display Metrics
-# ==============================================
-st.subheader("📌 Model Performance Summary")
+# -----------------------------
+# PAGE 3: MODEL METRICS
+# -----------------------------
+elif page == "📀 Model Performance Metrics":
+    st.subheader("Model Evaluation Metrics")
 
-if metrics is not None:
-    m1 = round(float(metrics["RMSE"]), 2)
-    m2 = round(float(metrics["MAPE (%)"]), 2)
-    m3 = round(float(metrics["WAPE (%)"]), 2)
+    col1, col2 = st.columns(2)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("RMSE", m1)
-    col2.metric("MAPE %", m2)
-    col3.metric("WAPE %", m3)
+    with col1:
+        st.markdown("### 🚀 LightGBM Metrics")
+        st.json(metrics_lgb)
 
-else:
-    st.info("Metrics file not found — add lightgbm_metrics.pkl to deployment directory.")
+        st.markdown("### 🧪 ARIMA Metrics")
+        st.json(metrics_arima)
 
-# ==============================================
-# Final Notes
-# ==============================================
+    with col2:
+        st.markdown("### 📉 Baseline Metrics")
+        st.json(metrics_baseline)
+
+        st.markdown("### ⏳ SARIMA Metrics")
+        st.json(metrics_sarima)
+
+    st.info("These metrics were computed during model development.")
+
+
+# -----------------------------
+# FOOTER
+# -----------------------------
 st.markdown("---")
-st.markdown("✔ Built using ARIMA, SARIMA & LightGBM Models")
-st.markdown("✔ SHAP Explainability applied to ensure trust in predictions")
-st.markdown("📌 Final Deployment Bundle: `deployment/` directory")
-st.markdown("👤 Developed by **Valentine (Group Black - Ngao Labs)**")
+st.markdown("📌 Built for Demand Planning & Forecasting Capstone Project")
+st.markdown("🧠 Powered by Machine Learning")
