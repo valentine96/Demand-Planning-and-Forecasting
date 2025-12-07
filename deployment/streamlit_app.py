@@ -1,196 +1,232 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import pickle
 import os
 
-# ------------------------------------------------------------------------------
-# MUST BE FIRST STREAMLIT CALL
-# ------------------------------------------------------------------------------
+# -----------------------------
+# CONFIG
+# -----------------------------
+DEPLOY_DIR = "deployment"
+
 st.set_page_config(
-    page_title="Forecasting System",
+    page_title="Retail Demand Forecasting Dashboard",
     layout="wide"
 )
 
-# ------------------------------------------------------------------------------
-# Paths (Important!)
-# ------------------------------------------------------------------------------
-ARTIFACT_DIR = "deployment"
-
-MODEL_PATH = f"{ARTIFACT_DIR}/lightgbm_model.pkl"
-FEATURES_PATH = f"{ARTIFACT_DIR}/feature_columns.pkl"
-BASELINE_METRICS_PATH = f"{ARTIFACT_DIR}/baseline_metrics.pkl"
-ARIMA_METRICS_PATH = f"{ARTIFACT_DIR}/arima_metrics.pkl"
-SARIMA_METRICS_PATH = f"{ARTIFACT_DIR}/sarima_metrics.pkl"
-LGBM_METRICS_PATH = f"{ARTIFACT_DIR}/lightgbm_metrics.pkl"
-SAMPLE_DATA_PATH = f"{ARTIFACT_DIR}/deployment_full_features.csv"
-
-# ------------------------------------------------------------------------------
-# Utilities
-# ------------------------------------------------------------------------------
-def verify_file(path: str) -> bool:
-    """Check if a file exists."""
-    return os.path.exists(path)
-
-def missing(msg: str):
-    """Show a Streamlit error for a missing file."""
-    st.error(f"❌ Missing file: `{msg}`")
+# -----------------------------
+# DATA LOADERS  (cached)
+# -----------------------------
+@st.cache_data
+def load_val_results():
+    path = os.path.join(DEPLOY_DIR, "lightgbm_val_predictions.csv")
+    df = pd.read_csv(path, parse_dates=["Date"])
+    return df
 
 @st.cache_data
-def load_pickle(path: str):
-    try:
-        with open(path, "rb") as f:
+def load_baseline_weekly():
+    path = os.path.join(DEPLOY_DIR, "baseline_weekly_predictions.csv")
+    df = pd.read_csv(path, parse_dates=["Date"])
+    return df
+
+@st.cache_data
+def load_store1_weekly():
+    path = os.path.join(DEPLOY_DIR, "store1_weekly_predictions.csv")
+    df = pd.read_csv(path, parse_dates=["Date"])
+    return df
+
+@st.cache_data
+def load_metrics():
+    def load_pkl(name):
+        with open(os.path.join(DEPLOY_DIR, name), "rb") as f:
             return pickle.load(f)
-    except Exception:
-        return None
 
-@st.cache_data
-def load_csv(path: str):
-    try:
-        return pd.read_csv(path)
-    except Exception:
-        return None
+    baseline = load_pkl("baseline_metrics.pkl")
+    arima    = load_pkl("arima_metrics.pkl")
+    sarima   = load_pkl("sarima_metrics.pkl")
+    lgbm     = load_pkl("lightgbm_metrics.pkl")
 
-# ------------------------------------------------------------------------------
-# Validate Required Artifacts
-# ------------------------------------------------------------------------------
-required = {
-    "LightGBM Model": MODEL_PATH,
-    "Feature Columns": FEATURES_PATH,
-    "Sample Data": SAMPLE_DATA_PATH,
-    "Baseline Metrics": BASELINE_METRICS_PATH,
-    "ARIMA Metrics": ARIMA_METRICS_PATH,
-    "SARIMA Metrics": SARIMA_METRICS_PATH,
-    "LightGBM Metrics": LGBM_METRICS_PATH,
-}
+    metrics_df = pd.DataFrame([
+        {"Model": "Baseline (7-day Lag)", **baseline},
+        {"Model": "ARIMA (1,1,1)",       **arima},
+        {"Model": "SARIMA",              **sarima},
+        {"Model": "LightGBM",            **lgbm},
+    ])
 
-missing_any = False
-for name, path in required.items():
-    if not verify_file(path):
-        missing(path)
-        missing_any = True
+    # Rename columns for display
+    metrics_df = metrics_df.rename(
+        columns={
+            "RMSE": "RMSE",
+            "MAPE (%)": "MAPE (%)" if "MAPE (%)" in metrics_df.columns else "MAPE",
+            "WAPE (%)": "WAPE (%)" if "WAPE (%)" in metrics_df.columns else "WAPE",
+        }
+    )
 
-if missing_any:
-    st.warning("⚠️ Model or artifacts missing. Please ensure all required files are present.")
-    st.stop()
+    return metrics_df
 
-# ------------------------------------------------------------------------------
-# Load Everything
-# ------------------------------------------------------------------------------
-model = load_pickle(MODEL_PATH)
-features = load_pickle(FEATURES_PATH)          # this is a list of column names
-baseline_metrics = load_pickle(BASELINE_METRICS_PATH)
-arima_metrics = load_pickle(ARIMA_METRICS_PATH)
-sarima_metrics = load_pickle(SARIMA_METRICS_PATH)
-lgbm_metrics = load_pickle(LGBM_METRICS_PATH)
-sample_df = load_csv(SAMPLE_DATA_PATH)
+# -----------------------------
+# LOAD DATA
+# -----------------------------
+val_df       = load_val_results()
+baseline_w   = load_baseline_weekly()
+store1_weekly = load_store1_weekly()
+metrics_df   = load_metrics()
 
-# Fail-safe for loading
-if any(x is None for x in [
-    model, features, baseline_metrics, arima_metrics,
-    sarima_metrics, lgbm_metrics, sample_df
-]):
-    st.error("❌ One or more artifacts could not be loaded. Ensure correct pickle/CSV versions.")
-    st.stop()
+# Pre-compute overall series for overview charts
+val_mean = (
+    val_df.groupby("Date")[["Sales", "LGB_Pred"]]
+    .mean()
+    .reset_index()
+    .rename(columns={"Sales": "Actual", "LGB_Pred": "Forecast"})
+)
 
-# Normalise feature names into a list
-if isinstance(features, (list, tuple)):
-    feature_names = list(features)
-else:
-    # Fallback if someone saved a DataFrame/Series instead
-    feature_names = list(getattr(features, "columns", features))
+# -----------------------------
+# SIDEBAR NAVIGATION
+# -----------------------------
+st.sidebar.title("Navigation")
+page = st.sidebar.radio(
+    "Go to",
+    ["Overview", "Store Explorer", "Model Comparison", "Drivers of Demand (Explainability)"]
+)
 
-n_features = len(feature_names)
+# -----------------------------
+# PAGE 1: OVERVIEW
+# -----------------------------
+if page == "Overview":
+    st.title("Retail Demand Forecasting Dashboard")
+    st.markdown(
+        """
+        This dashboard helps demand planners **see and trust** the forecasts
+        generated by the LightGBM model.  
+        It focuses on daily store-level sales, seasonality, and planning
+        for replenishment, promotions, and inventory alignment.
+        """
+    )
 
-# ------------------------------------------------------------------------------
-# UI Header
-# ------------------------------------------------------------------------------
-st.title("🧠 Demand Planning & Forecasting System")
-st.markdown("### Machine Learning Driven Forecasting for Retail & FMCG")
+    # --- KPIs (using LightGBM + Baseline) ---
+    lgb_row = metrics_df[metrics_df["Model"] == "LightGBM"].iloc[0]
+    base_row = metrics_df[metrics_df["Model"] == "Baseline (7-day Lag)"].iloc[0]
 
-st.success(f"📌 Loaded model expects **{n_features} features**.")
-st.info(f"📄 Sample data contains **{sample_df.shape[1]} columns**.")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("LightGBM MAPE (%)", f"{lgb_row['MAPE (% )'] if 'MAPE (% )' in lgb_row else lgb_row['MAPE']:0.2f}")
+    col2.metric("LightGBM WAPE (%)", f"{lgb_row['WAPE (% )'] if 'WAPE (% )' in lgb_row else lgb_row['WAPE']:0.2f}")
+    improvement = base_row["MAPE"] - (lgb_row.get("MAPE (% )", lgb_row.get("MAPE")))
+    col3.metric("Error reduction vs Baseline (MAPE)", f"{improvement:0.2f} pts")
 
-st.divider()
+    st.markdown("---")
 
-# ------------------------------------------------------------------------------
-# Simple categorical handling (no category-set alignment needed here)
-# ------------------------------------------------------------------------------
-st.subheader("🔧 Feature Type Check")
+    # --- Chain-level Actual vs Forecast ---
+    st.subheader("Average Sales Across All Stores: Actual vs Forecast")
+    st.line_chart(
+        val_mean.set_index("Date")[["Actual", "Forecast"]]
+    )
 
-categorical_cols = ["StoreType", "Assortment", "PromoInterval", "StateHoliday"]
-casted = []
+    st.caption(
+        "The orange and blue lines should move closely together. "
+        "The closer they are, the more accurate the model is at capturing "
+        "overall demand patterns across the chain."
+    )
 
-for col in categorical_cols:
-    if col in sample_df.columns:
-        sample_df[col] = sample_df[col].astype("category")
-        casted.append(col)
+# -----------------------------
+# PAGE 2: STORE EXPLORER
+# -----------------------------
+elif page == "Store Explorer":
+    st.title("Store-level Forecast Explorer")
 
-if casted:
-    st.success(f"✔️ Cast to categorical dtype: {', '.join(casted)}")
-else:
-    st.info("ℹ️ No categorical casting applied (columns not found or already numeric).")
+    store_list = sorted(val_df["Store"].unique())
+    store_id = st.selectbox("Select a Store", store_list)
 
-st.divider()
+    store_data = (
+        val_df[val_df["Store"] == store_id]
+        .sort_values("Date")
+        .copy()
+    )
+    store_data = store_data.rename(columns={"Sales": "Actual", "LGB_Pred": "Forecast"})
+    store_data = store_data.set_index("Date")
 
-# ------------------------------------------------------------------------------
-# DATA PREVIEW
-# ------------------------------------------------------------------------------
-st.header("🔍 Preview Input Data Used For Prediction")
+    st.subheader(f"Actual vs Forecasted Sales – Store {store_id}")
+    st.line_chart(store_data[["Actual", "Forecast"]])
 
-rows = st.slider("Rows to preview", 1, 50, 5)
-st.dataframe(sample_df.head(rows), use_container_width=True)
+    st.caption(
+        "This view helps planners quickly see if a specific store is "
+        "tracking above or below the forecast, and spot unusual dips or spikes."
+    )
 
-st.divider()
+    # Simple daily error table
+    store_data["Absolute Error"] = (store_data["Actual"] - store_data["Forecast"]).abs()
+    st.subheader("Daily Forecast Error (Store Level)")
+    st.dataframe(store_data[["Actual", "Forecast", "Absolute Error"]].tail(30))
 
-# ------------------------------------------------------------------------------
-# SECTION 1 — PREDICTION
-# ------------------------------------------------------------------------------
-st.header("📦 Store Sales Prediction using LightGBM")
+# -----------------------------
+# PAGE 3: MODEL COMPARISON
+# -----------------------------
+elif page == "Model Comparison":
+    st.title("Model Performance Comparison")
 
-st.write("Model loaded successfully. Preview sample input data used in prediction:")
-st.dataframe(sample_df.head(), use_container_width=True)
+    st.markdown(
+        """
+        This section compares the **baseline**, **ARIMA**, **SARIMA**, and **LightGBM**
+        models using standard forecasting metrics.  
+        Lower values mean better performance.
+        """
+    )
 
-if st.button("🚀 Run Forecast Now"):
-    try:
-        # Ensure we only use the expected feature columns in the correct order
-        X = sample_df[feature_names]
-        preds = model.predict(X)
+    # Display metrics table
+    st.dataframe(metrics_df.style.format({"RMSE": "{:,.2f}", "MAPE": "{:,.2f}", "WAPE": "{:,.2f}"}))
 
-        sample_df["Forecast"] = preds
+    st.markdown("---")
+    st.subheader("Weekly Forecast – Store 1 (ARIMA vs SARIMA)")
 
-        st.success("🎉 Prediction Completed Successfully!")
-        st.dataframe(
-            sample_df[["Date", "Store", "Forecast"]].head(10),
-            use_container_width=True
+    chart_df = store1_weekly.copy()
+    chart_df = chart_df.rename(columns={"Sales": "Actual"})
+    chart_df = chart_df.set_index("Date")
+
+    st.line_chart(chart_df[["Actual", "ARIMA_Forecast", "SARIMA_Forecast"]])
+
+    st.caption(
+        "Here we see how classical ARIMA/SARIMA models perform on weekly Store 1 data. "
+        "Despite reasonable performance, LightGBM offers better flexibility and scalability "
+        "for all stores and daily forecasts."
+    )
+
+# -----------------------------
+# PAGE 4: DRIVERS OF DEMAND
+# -----------------------------
+elif page == "Drivers of Demand (Explainability)":
+    st.title("Drivers of Demand – Model Explainability")
+
+    st.markdown(
+        """
+        To make the model understandable to business users, we use **SHAP** values
+        (SHapley Additive exPlanations).  
+        SHAP shows how each feature (for example: **Promo**, **Day of Week**, **Lagged Sales**)
+        pushes the forecast **up or down**.
+        """
+    )
+
+    st.markdown(
+        """
+        **How to use this section (recommended workflow):**
+        1. From the notebook, save your SHAP summary plot as an image  
+           (e.g., `deployment/shap_summary.png`).  
+        2. The dashboard will display it below for planners.
+        """
+    )
+
+    shap_image_path = os.path.join(DEPLOY_DIR, "shap_summary.png")
+    if os.path.exists(shap_image_path):
+        st.image(shap_image_path, caption="SHAP Summary: Most Important Drivers of Demand")
+    else:
+        st.info(
+            "SHAP summary image not found. Save it as "
+            "`deployment/shap_summary.png` from your notebook to see it here."
         )
-    except Exception as e:
-        st.error(f"❌ Prediction failed: {str(e)}")
 
-st.divider()
-
-# ------------------------------------------------------------------------------
-# MODEL METRICS
-# ------------------------------------------------------------------------------
-st.header("📊 Full Model Metrics Comparison")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("📌 Baseline (Naive Model) Metrics")
-    st.json(baseline_metrics)
-
-with col2:
-    st.subheader("📌 ARIMA Metrics")
-    st.json(arima_metrics)
-
-col3, col4 = st.columns(2)
-
-with col3:
-    st.subheader("📌 SARIMA Metrics")
-    st.json(sarima_metrics)
-
-with col4:
-    st.subheader("📌 LightGBM Metrics")
-    st.json(lgbm_metrics)
-
-st.success("🎯 LightGBM achieved the strongest forecasting performance based on evaluation metrics.")
+    st.markdown(
+        """
+        In plain language, this helps planners answer questions like:
+        *“Are promotions, store traffic, or day-of-week driving most of the demand?”*
+        and  
+        *“Why did the model predict higher or lower sales for a given day?”*
+        """
+    )
