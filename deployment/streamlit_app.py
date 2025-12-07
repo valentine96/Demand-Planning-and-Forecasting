@@ -126,6 +126,7 @@ if page == "Overview":
         "The closer they are, the more accurate the model is at capturing "
         "overall demand patterns across the chain."
     )
+st.write("DEBUG - Metrics DF:", metrics_df)
 
 # -----------------------------
 # PAGE 2: STORE EXPLORER
