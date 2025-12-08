@@ -105,8 +105,7 @@ Metrics used:
 ## 🌐 **Live Dashboard**
 
 🎛 **Streamlit App:**  
-👉 *Add your deployed URL here:*  
-`https://your-app-name.streamlit.app`
+https://demand-planning-and-forecasting-3jrfrdbgv79yeafhxrwcvl.streamlit.app/
 
 ---
 
