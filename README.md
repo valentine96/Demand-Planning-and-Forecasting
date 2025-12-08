@@ -127,16 +127,13 @@ Inspect datasets and export for further analysis.
 
 Demand-Planning-and-Forecasting/
 │
-├── .devcontainer/               # Codespaces environment config
-├── data/                        # Dataset and raw CSV files
-├── deployment/                  # Legacy deployment folder (can be removed)
-├── notebooks/                   # Jupyter/Colab notebooks for EDA & modeling
-│
-├── Banner.png                   # Project banner for README
-├── forecast_results.csv         # Model forecast output (move to /data if needed)
-├── requirements.txt             # Python dependencies for Streamlit deployment
-├── streamlit_app.py             # Main Streamlit dashboard application
-├── README.md                    # Project documentation (this file)
-└── .gitignore                   # Git ignore rules
-
-
+├── .devcontainer/          # Codespaces environment config
+├── data/                   # Dataset and raw CSV files
+├── deployment/             # Legacy deployment folder (can be removed)
+├── notebooks/              # Jupyter/Colab notebooks for EDA & modeling
+├── Banner.png              # Project banner for README
+├── forecast_results.csv    # Model forecast output (move to /data if needed)
+├── requirements.txt        # Python dependencies for Streamlit deployment
+├── streamlit_app.py        # Main Streamlit dashboard application
+├── README.md               # Project documentation (this file)
+└── .gitignore              # Git ignore rules
