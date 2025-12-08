@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Banner.png" width="100%" />
+</p>
+
 # **🌟 Demand Planning and Forecasting Using Machine Learning**
 ## **Ngao Labs Bootcamp – Capstone Project**
 
