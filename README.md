@@ -1,5 +1,6 @@
 # **🌟 Demand Planning and Forecasting Using Machine Learning**
-##**Ngao Labs Bootcamp – Capstone Project**
+## **Ngao Labs Bootcamp – Capstone Project**
+
 ##**🧠 Project Overview**
 
 This project develops a machine learning–driven demand forecasting system tailored for the retail and FMCG sector. Using historical sales, promotions, holidays, and store-level attributes, the system predicts daily product demand to support:
