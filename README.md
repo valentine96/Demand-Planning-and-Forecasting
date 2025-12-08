@@ -125,7 +125,7 @@ Inspect datasets and export for further analysis.
 
 ## 📁 **Project Structure**
 
-Demand-Planning-and-Forecasting/
+```Demand-Planning-and-Forecasting/
 │
 ├── .devcontainer/          # Codespaces environment config
 ├── data/                   # Dataset and raw CSV files
@@ -136,5 +136,5 @@ Demand-Planning-and-Forecasting/
 ├── requirements.txt        # Python dependencies for Streamlit deployment
 ├── streamlit_app.py        # Main Streamlit dashboard application
 ├── README.md               # Project documentation (this file)
-└── .gitignore              # Git ignore rules
+└── .gitignore              # Git ignore rules```
 
