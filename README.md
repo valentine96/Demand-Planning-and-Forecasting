@@ -1,7 +1,7 @@
 # **🌟 Demand Planning and Forecasting Using Machine Learning**
 ## **Ngao Labs Bootcamp – Capstone Project**
 
-##**🧠 Project Overview**
+ ## **🧠 Project Overview**
 
 This project develops a machine learning–driven demand forecasting system tailored for the retail and FMCG sector. Using historical sales, promotions, holidays, and store-level attributes, the system predicts daily product demand to support:
 
@@ -11,7 +11,7 @@ This project develops a machine learning–driven demand forecasting system tail
 - Better distribution and replenishment decisions
 Accurate forecasting ultimately improves operational efficiency, profitability, and customer satisfaction — all critical metrics for retail success.
 
-##**🎯 Problem Statement**
+## **🎯 Problem Statement**
 
 Retail and FMCG companies face significant challenges in anticipating customer demand across numerous stores and time periods. Traditional forecasting approaches often fail to capture:
 - Store-specific behaviour
@@ -19,16 +19,16 @@ Retail and FMCG companies face significant challenges in anticipating customer d
 - Seasonality patterns
 - Holiday effects
 - Trend and competition dynamics
-- 
+  
 As a result, organizations experience:
 
  - Stockouts, causing lost sales and poor customer experiences
--  Overstocking, leading to unnecessary holding and warehousing costs
-- Inefficient distribution, inflating logistics expenses
--  Unoptimized promotional planning
+ -  Overstocking, leading to unnecessary holding and warehousing costs
+ - Inefficient distribution, inflating logistics expenses
+ -  Unoptimized promotional planning
 This capstone project aims to deliver a robust, scalable forecasting system that improves accuracy by 20–30% compared to baseline models, contributing to an estimated 10–15% reduction in inventory-related losses.
 
-🎯 Project Objectives
+## **🎯 Project Objectives**
 
 ✔ Build a machine learning time-series forecasting model for store-level demand
 
@@ -46,7 +46,7 @@ This capstone project aims to deliver a robust, scalable forecasting system that
 
 ✔ Support inventory optimization with an estimated 10–15% cost reduction
 
-###**📊 Dataset Description — Rossmann Store Sales (Kaggle)**
+### **📊 Dataset Description — Rossmann Store Sales (Kaggle)**
 
 The project uses the Rossmann Store Sales Dataset, a widely studied real-world retail forecasting dataset. It contains:
 
@@ -64,7 +64,7 @@ The project uses the Rossmann Store Sales Dataset, a widely studied real-world r
 
 https://www.kaggle.com/c/rossmann-store-sales/data
 
-###**🧩 Modeling Approach**
+### **🧩 Modeling Approach**
 **1. Baseline Model**
 
 Seasonal Naïve Forecast
@@ -95,7 +95,7 @@ Prophet models overall trend + seasonality
 
 Lightgbm learns residuals and nonlinear promo-driven patterns
 
-###**4. Model Evaluation Metrics**
+### **4. Model Evaluation Metrics**
 
 RMSE – Penalizes large errors
 
@@ -119,7 +119,7 @@ Rolling-origin cross-validation – Time-aware validation
 
 💰 Reduced operational costs and enhanced profitability
 
-👥 Team
+## **👥 Team**
 
 Valentine Mbuthu
 
