@@ -2,131 +2,129 @@
   <img src="Banner.png" width="100%" />
 </p>
 
-# **🌟 Demand Planning and Forecasting Using Machine Learning**
-## **Ngao Labs Bootcamp – Capstone Project**
+# 🌟 Machine Learning for Retail Demand Planning & Forecasting  
+### **Ngao Labs Bootcamp – Capstone Project**
 
- ## **🧠 Project Overview**
+---
 
-This project develops a machine learning–driven demand forecasting system tailored for the retail and FMCG sector. Using historical sales, promotions, holidays, and store-level attributes, the system predicts daily product demand to support:
+## 🧭 **Executive Summary**
 
-- Efficient inventory planning
-- Reduction of stockouts
-- Lower overstocking and carrying costs
-- Better distribution and replenishment decisions
-Accurate forecasting ultimately improves operational efficiency, profitability, and customer satisfaction — all critical metrics for retail success.
+This project develops a **machine learning–driven demand forecasting system** designed for the retail and FMCG sector. Using historical sales, promotions, store attributes, and calendar patterns, we built a forecasting workflow that significantly improves accuracy over baseline models. The final solution is deployed as a **live interactive Streamlit dashboard**, enabling planners to analyze forecasts at the store and chain level for improved replenishment, promo planning, and inventory alignment.
 
-## **🎯 Problem Statement**
+---
 
-Retail and FMCG companies face significant challenges in anticipating customer demand across numerous stores and time periods. Traditional forecasting approaches often fail to capture:
-- Store-specific behaviour
-- Promo-driven spikes
-- Seasonality patterns
-- Holiday effects
-- Trend and competition dynamics
-  
-As a result, organizations experience:
+## 🔍 **Problem Statement**
 
- - Stockouts, causing lost sales and poor customer experiences
- -  Overstocking, leading to unnecessary holding and warehousing costs
- - Inefficient distribution, inflating logistics expenses
- -  Unoptimized promotional planning
-This capstone project aims to deliver a robust, scalable forecasting system that improves accuracy by 20–30% compared to baseline models, contributing to an estimated 10–15% reduction in inventory-related losses.
+Retail businesses often struggle with:
 
-## **🎯 Project Objectives**
+- ❌ **Stockouts**, leading to lost sales  
+- 📉 **Overstocking**, causing storage & holding cost increases  
+- 🚚 **Inefficient distribution planning**  
+- 🎯 **Uninformed promotional planning**
 
-✔ Build a machine learning time-series forecasting model for store-level demand
+Accurate forecasting helps reduce these inefficiencies and can cut inventory-related losses by **10–15%**.
 
-✔ Engineer meaningful features (temporal lags, promos, store attributes, holidays)
+This project builds a scalable forecasting engine capable of improving prediction accuracy by **20–30%** over traditional methods.
 
-✔ Evaluate multiple forecasting approaches, including ARIMA,SARIMA and gradient boosting models
+---
 
-✔ Benchmark performance against a Seasonal Naïve baseline
+## 🎯 **Project Objectives**
 
-✔ Identify key demand drivers such as seasonality and promotional activity
+- Develop a **store-level time-series forecasting model**
+- Engineer robust **time-based & promo-driven features**
+- Compare statistical and ML models:
+  - Seasonal Naïve (baseline)
+  - ARIMA / SARIMA
+  - LightGBM with lag features
+- Evaluate models using:
+  - RMSE  
+  - MAPE  
+  - SMAPE  
+  - WAPE  
+- Deploy a **fully interactive dashboard**
+- Enhance forecast reliability for real business applications
 
-✔ Deploy the final model through an interactive dashboard (Streamlit)
+---
 
-✔ Achieve at least a 20–30% improvement in forecast accuracy
+## 📊 **Dataset Description (Rossmann Store Sales – Kaggle)**
 
-✔ Support inventory optimization with an estimated 10–15% cost reduction
+This project uses the **Rossmann Store Sales dataset**, containing over 1,000 stores with:
 
-### **📊 Dataset Description — Rossmann Store Sales (Kaggle)**
+- 🏬 Store-level daily sales  
+- 👥 Customer counts  
+- 🎉 Promotion information (Promo, Promo2)  
+- 🏷 Store attributes (Type, Assortment)  
+- 🗺 Competition data  
+- 📅 Holidays & seasonality patterns  
 
-The project uses the Rossmann Store Sales Dataset, a widely studied real-world retail forecasting dataset. It contains:
-
-🛒 Daily sales and customer counts
-
-🎯 Promotional activity (Promo, Promo2, PromoInterval)
-
-🏬 Store characteristics (StoreType, Assortment, CompetitionDistance)
-
-📅 Calendar features (dates, school holidays, state holidays)
-
-📈 Strong trends and seasonality patterns
-
-🔗 Dataset Link
-
+🔗 **Dataset Link:**  
 https://www.kaggle.com/c/rossmann-store-sales/data
 
-### **🧩 Modeling Approach**
-**1. Baseline Model**
+---
 
-Seasonal Naïve Forecast
+## 🧠 **Modeling Approach**
 
-Uses the previous season’s value (same weekday last year)
+### **1️⃣ Baseline Model — Seasonal Naïve**
+- Uses last year's same-day sales to predict current sales  
+- Provides a benchmark for ML & statistical models  
 
-Provides a time-aware benchmark that models must outperform
+### **2️⃣ Statistical Models**
+- **ARIMA / SARIMA** for capturing trend + seasonality
 
-**2. Advanced Statistical Models**
+### **3️⃣ Machine Learning Models**
+- **LightGBM** (best-performing model)
+  - Leverages lag features
+  - Captures non-linear relationships
+  - Handles promotions & store effects
 
-ARIMA – Captures auto-correlations and short-term trends
+### **4️⃣ Model Evaluation**
+Metrics used:
 
-SARIMA – Adds seasonal patterns such as weekly/monthly cycles
+| Metric | Purpose |
+|-------|---------|
+| RMSE | Overall error magnitude |
+| MAPE | Percentage error |
+| SMAPE | Symmetric error metric used for forecasting |
+| WAPE | Weighted error across varying demand levels |
 
-Prophet – Effective for trend + seasonality + holidays
+---
 
-**3. Machine Learning Models**
+## 🏆 **Final Results**
 
-LightGBM
+| Model | RMSE | MAPE (%) | WAPE (%) |
+|-------|-------|-----------|-----------|
+| Baseline | 2614.59 | 31.82 | 31.18 |
+| ARIMA | 781.22 | 13.85 | 15.27 |
+| SARIMA | 445.01 | 7.14 | 8.00 |
+| **LightGBM (Best)** | **514.95** | **5.82** | **5.64** |
 
-Incorporates lag features, rolling windows, promo effects, and store metadata
+👉 **LightGBM outperformed all models and was selected for deployment.**
 
-Captures complex nonlinear relationships
+---
 
-Hybrid Model (Prophet + XGBoost)
+## 🌐 **Live Dashboard**
 
-Prophet models overall trend + seasonality
+🎛 **Streamlit App:**  
+👉 *Add your deployed URL here:*  
+`https://your-app-name.streamlit.app`
 
-Lightgbm learns residuals and nonlinear promo-driven patterns
+---
 
-### **4. Model Evaluation Metrics**
+## 🖥 **Dashboard Features**
 
-RMSE – Penalizes large errors
+### ✔ Model Metrics Summary  
+View RMSE, MAPE, WAPE comparisons for all models.
 
-MAPE – Measures percentage error
+### ✔ Chain Forecast  
+Compare actual vs. forecasted demand across the entire store network.
 
-WAPE – Weighted accuracy across stores
+### ✔ Store-Level Forecast Explorer  
+Drill into individual stores and evaluate SMAPE performance.
 
-SMAPE – Symmetric, stable error comparison
+### ✔ Data Preview & Download  
+Inspect datasets and export for further analysis.
 
-Rolling-origin cross-validation – Time-aware validation
+---
 
-📈 Expected Business Impact
+## 📁 **Project Structure**
 
-⭐ 20–30% improvement in forecast accuracy
-
-📉 10–15% reduction in inventory losses
-
-🚚 Improved distribution and replenishment planning
-
-🛒 Better promo and campaign planning
-
-💰 Reduced operational costs and enhanced profitability
-
-## **👥 Team**
-
-Valentine Mbuthu
-
-Evalyne Kagendo
-
-Supervisor: Elsie Kiprop
