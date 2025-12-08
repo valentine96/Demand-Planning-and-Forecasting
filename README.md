@@ -38,8 +38,7 @@ This project builds a scalable forecasting engine capable of improving predictio
   - LightGBM with lag features
 - Evaluate models using:
   - RMSE  
-  - MAPE  
-  - SMAPE  
+  - MAPE   
   - WAPE  
 - Deploy a **fully interactive dashboard**
 - Enhance forecast reliability for real business applications
@@ -84,7 +83,6 @@ Metrics used:
 |-------|---------|
 | RMSE | Overall error magnitude |
 | MAPE | Percentage error |
-| SMAPE | Symmetric error metric used for forecasting |
 | WAPE | Weighted error across varying demand levels |
 
 ---
@@ -126,4 +124,19 @@ Inspect datasets and export for further analysis.
 ---
 
 ## 📁 **Project Structure**
+
+Demand-Planning-and-Forecasting/
+│
+├── .devcontainer/               # Codespaces environment config
+├── data/                        # Dataset and raw CSV files
+├── deployment/                  # Legacy deployment folder (can be removed)
+├── notebooks/                   # Jupyter/Colab notebooks for EDA & modeling
+│
+├── Banner.png                   # Project banner for README
+├── forecast_results.csv         # Model forecast output (move to /data if needed)
+├── requirements.txt             # Python dependencies for Streamlit deployment
+├── streamlit_app.py             # Main Streamlit dashboard application
+├── README.md                    # Project documentation (this file)
+└── .gitignore                   # Git ignore rules
+
 
