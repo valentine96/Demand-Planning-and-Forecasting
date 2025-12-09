@@ -164,3 +164,12 @@ pip install -r requirements.txt
 
 ### 4️⃣ Run the Streamlit App
 streamlit run streamlit_app.py
+
+
+| **Role**          | **Name**                                          |
+| ----------------- | ------------------------------------------------- |
+| Project Lead      | Valentine Mbuthu                                  |
+| Peer Collaborator | Evalyne Kagendo                                   |
+| Mentor            | Elsie Kiprop                                      |
+| Bootcamp          | Ngao Labs – Data Science & AI Foundations Program |
+
