@@ -142,10 +142,7 @@ Inspect datasets and export for further analysis.
 
 Follow the steps below to set up and run the Streamlit dashboard on your machine.
 
-### **1️⃣ Clone the Repository**
-```bash
-git clone https://github.com/valentine96/Demand-Planning-and-Forecasting.git
-cd Demand-Planning-and-Forecasting
-### 2️⃣ Create a Virtual Environment
-### 3️⃣ Install Dependencies
-### 4️⃣ Run the Streamlit App
+**Clone the Repository**
+**Create a Virtual Environment**
+**Install Dependencies**
+**Run the Streamlit App**
