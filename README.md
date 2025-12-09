@@ -125,7 +125,7 @@ Inspect datasets and export for further analysis.
 
 ## 📁 **Project Structure**
 
-```Demand-Planning-and-Forecasting/
+Demand-Planning-and-Forecasting/
 │
 ├── .devcontainer/          # Codespaces environment config
 ├── data/                   # Dataset and raw CSV files
