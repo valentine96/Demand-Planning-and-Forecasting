@@ -138,6 +138,8 @@ Inspect datasets and export for further analysis.
 ├── README.md               # Project documentation (this file)
 └── .gitignore              # Git ignore rules```
 
+
+------
 ## 🔧 How to Run the Project Locally
 
 Follow the steps below to set up and run the Streamlit dashboard on your machine.
