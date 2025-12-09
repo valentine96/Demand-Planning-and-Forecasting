@@ -145,7 +145,22 @@ Demand-Planning-and-Forecasting/
 
 Follow the steps below to set up and run the Streamlit dashboard on your machine.
 
-**Clone the Repository**
-**Create a Virtual Environment**
-**Install Dependencies**
-**Run the Streamlit App**
+
+### 1️⃣ Clone the Repository
+git clone https://github.com/valentine96/Demand-Planning-and-Forecasting.git
+cd Demand-Planning-and-Forecasting
+
+### 2️⃣ Create a Virtual Environment
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Mac/Linux
+python3 -m venv venv
+source venv/bin/activate
+
+### 3️⃣ Install Dependencies
+pip install -r requirements.txt
+
+### 4️⃣ Run the Streamlit App
+streamlit run streamlit_app.py
