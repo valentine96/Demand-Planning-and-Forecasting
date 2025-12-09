@@ -139,7 +139,7 @@ Inspect datasets and export for further analysis.
 └── .gitignore              # Git ignore rules```
 
 
-------
+<br>
 ## 🔧 How to Run the Project Locally
 
 Follow the steps below to set up and run the Streamlit dashboard on your machine.
