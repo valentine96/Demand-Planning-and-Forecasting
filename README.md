@@ -136,7 +136,7 @@ Inspect datasets and export for further analysis.
 ├── requirements.txt        # Python dependencies for Streamlit deployment
 ├── streamlit_app.py        # Main Streamlit dashboard application
 ├── README.md               # Project documentation (this file)
-└── .gitignore              # Git ignore rules```
+└── .gitignore              # Git ignore rules
 
 
 <br>
